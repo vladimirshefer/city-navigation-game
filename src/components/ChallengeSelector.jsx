@@ -10,7 +10,6 @@ export default function ChallengeSelector() {
   const [cardTimestamps, setCardTimestamps] = useState({})
   const [, setTickCount] = useState(0)
   const [history, setHistory] = useState([])
-  const [category, setCategory] = useState('all')
   const [activeCurse, setActiveCurse] = useState(null)
   const [curseTimestamp, setCurseTimestamp] = useState(null)
   const [gameStartTime, setGameStartTime] = useState(null)
@@ -134,25 +133,6 @@ export default function ChallengeSelector() {
     return [shuffled[0], shuffled[1]]
   }
 
-  const handleDrawCards = () => {
-    let cards = ALL_CARDS
-    if (category === 'challenges') cards = CHALLENGES
-    else if (category === 'curses') cards = CURSES
-    else if (category === 'special') cards = SPECIAL_CARDS
-
-    const drawn = getRandomCards(cards)
-    const now = Date.now()
-
-    const newTimestamps = {}
-    drawn.forEach((card) => {
-      newTimestamps[card.id] = now
-    })
-
-    setDrawnCards(drawn)
-    setCardTimestamps(newTimestamps)
-    saveToStorage(drawn, newTimestamps, history)
-  }
-
   const getTimeRemaining = (cardId) => {
     if (!cardTimestamps[cardId]) return TIMER_DURATION
     const elapsed = Math.floor((Date.now() - cardTimestamps[cardId]) / 1000)
@@ -217,52 +197,6 @@ export default function ChallengeSelector() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setCategory('all')}
-          disabled={!!drawnCards}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            category === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          All Cards
-        </button>
-        <button
-          onClick={() => setCategory('challenges')}
-          disabled={!!drawnCards}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            category === 'challenges'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          Challenges
-        </button>
-        <button
-          onClick={() => setCategory('curses')}
-          disabled={!!drawnCards}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            category === 'curses'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          Curses
-        </button>
-        <button
-          onClick={() => setCategory('special')}
-          disabled={!!drawnCards}
-          className={`px-4 py-2 rounded-lg font-semibold transition ${
-            category === 'special'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          Special Cards
-        </button>
-      </div>
 
       {drawnCards && (
         <div className="text-sm text-gray-600">
