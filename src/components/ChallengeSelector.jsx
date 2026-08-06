@@ -198,12 +198,6 @@ export default function ChallengeSelector() {
   return (
     <div className="space-y-6">
 
-      {drawnCards && (
-        <div className="text-sm text-gray-600">
-          {drawnCards.length} card{drawnCards.length !== 1 ? 's' : ''} active {activeCurse && '+ 1 curse'}
-        </div>
-      )}
-
       {activeCurse && (
         <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-red-700">
           <div className="space-y-4 flex-1">
