@@ -12,7 +12,10 @@ export default function ChallengeSelector() {
   const [category, setCategory] = useState('all')
 
   useEffect(() => {
-    loadFromStorage()
+    const loaded = loadFromStorage()
+    if (!loaded) {
+      drawInitialCards()
+    }
   }, [])
 
   useEffect(() => {
@@ -32,7 +35,31 @@ export default function ChallengeSelector() {
       setDrawnCards(state.drawnCards)
       setCardTimestamps(state.cardTimestamps || {})
       setHistory(state.history)
+      return true
     }
+    return false
+  }
+
+  const drawInitialCards = () => {
+    const drawn = getRandomCards(ALL_CARDS)
+    const now = Date.now()
+    const newTimestamps = {}
+    drawn.forEach((card) => {
+      newTimestamps[card.id] = now
+    })
+    setDrawnCards(drawn)
+    setCardTimestamps(newTimestamps)
+    saveToStorage(drawn, newTimestamps, [])
+  }
+
+  const drawReplacementCard = (cards, timestamps, hist) => {
+    const drawn = getRandomCards(ALL_CARDS)
+    const now = Date.now()
+    const newCards = [...cards, drawn[0]]
+    const newTimestamps = { ...timestamps, [drawn[0].id]: now }
+    setDrawnCards(newCards)
+    setCardTimestamps(newTimestamps)
+    saveToStorage(newCards, newTimestamps, hist)
   }
 
   const saveToStorage = (cards, timestamps, hist) => {
@@ -85,16 +112,7 @@ export default function ChallengeSelector() {
     const newTimestamps = { ...cardTimestamps }
     delete newTimestamps[cardId]
 
-    if (remaining.length > 0) {
-      setDrawnCards(remaining)
-      setCardTimestamps(newTimestamps)
-      saveToStorage(remaining, newTimestamps, newHistory)
-    } else {
-      setDrawnCards(null)
-      setCardTimestamps({})
-      setHistory(newHistory)
-      saveToStorage(null, {}, newHistory)
-    }
+    drawReplacementCard(remaining, newTimestamps, newHistory)
   }
 
   const getCategoryColor = (card) => {
@@ -208,12 +226,24 @@ export default function ChallengeSelector() {
         </div>
       )}
 
-      {!drawnCards && (
+      {drawnCards && (
         <button
-          onClick={handleDrawCards}
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition"
+          onClick={() => {
+            localStorage.removeItem(STORAGE_KEY)
+            const drawn = getRandomCards(ALL_CARDS)
+            const now = Date.now()
+            const newTimestamps = {}
+            drawn.forEach((card) => {
+              newTimestamps[card.id] = now
+            })
+            setDrawnCards(drawn)
+            setCardTimestamps(newTimestamps)
+            setHistory([])
+            saveToStorage(drawn, newTimestamps, [])
+          }}
+          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition"
         >
-          Draw 2 Cards
+          New Game
         </button>
       )}
 
