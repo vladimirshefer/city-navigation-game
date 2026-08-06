@@ -1,0 +1,19 @@
+src/components/ChallengeSelector.jsx
+  s_56d6e233ebdff0::t_7809231a6bf857 9-10,19,22-25,27,31,38,41-46,48,52-57,74-80,82-83,85,90,92,97-98,102-103,106,108,180-181,193-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "512af575b83f14452215294dbf4e8401e3e6f0b4",
+  "prompts": {},
+  "sessions": {
+    "s_56d6e233ebdff0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eac6948d-c59c-4cc5-a877-7cd588cbe674",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Vladimir Shefer <vladimir.shefer@deliveryhero.com>"
+    }
+  }
+}
