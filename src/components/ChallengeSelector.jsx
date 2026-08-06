@@ -99,9 +99,22 @@ export default function ChallengeSelector() {
     const now = Date.now()
     const newCards = [...cards, drawn[0]]
     const newTimestamps = { ...timestamps, [drawn[0].id]: now }
+
+    let curse = activeCurse
+    let curseTs = curseTimestamp
+    let lastCurse = lastCurseTime
+
+    if (!activeCurse && shouldDrawCurse(lastCurseTime || gameStartTime)) {
+      curse = drawCurseCard()
+      curseTs = now
+      lastCurse = lastCurseTime
+    }
+
     setDrawnCards(newCards)
     setCardTimestamps(newTimestamps)
-    saveToStorage(newCards, newTimestamps, hist, activeCurse, curseTimestamp, gameStartTime, lastCurseTime)
+    setActiveCurse(curse)
+    setCurseTimestamp(curseTs)
+    saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse)
   }
 
   const saveToStorage = (cards, timestamps, hist, curse = null, curseTs = null, startTime = null, lastCurseTs = null) => {
