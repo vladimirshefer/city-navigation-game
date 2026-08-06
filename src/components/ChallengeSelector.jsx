@@ -7,7 +7,7 @@ const TIMER_DURATION = 3600
 export default function ChallengeSelector() {
   const [drawnCards, setDrawnCards] = useState(null)
   const [cardTimestamps, setCardTimestamps] = useState({})
-  const [timers, setTimers] = useState({})
+  const [, setTickCount] = useState(0)
   const [history, setHistory] = useState([])
   const [category, setCategory] = useState('all')
 
@@ -19,16 +19,11 @@ export default function ChallengeSelector() {
     if (!drawnCards || drawnCards.length === 0) return
 
     const interval = setInterval(() => {
-      const newTimers = {}
-      drawnCards.forEach((card) => {
-        const elapsed = Math.floor((Date.now() - cardTimestamps[card.id]) / 1000)
-        newTimers[card.id] = Math.max(0, TIMER_DURATION - elapsed)
-      })
-      setTimers(newTimers)
+      setTickCount((prev) => prev + 1)
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [drawnCards, cardTimestamps])
+  }, [drawnCards])
 
   const loadFromStorage = () => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -37,15 +32,6 @@ export default function ChallengeSelector() {
       setDrawnCards(state.drawnCards)
       setCardTimestamps(state.cardTimestamps || {})
       setHistory(state.history)
-
-      const loadedTimers = {}
-      if (state.drawnCards && state.cardTimestamps) {
-        state.drawnCards.forEach((card) => {
-          const elapsed = Math.floor((Date.now() - state.cardTimestamps[card.id]) / 1000)
-          loadedTimers[card.id] = Math.max(0, TIMER_DURATION - elapsed)
-        })
-      }
-      setTimers(loadedTimers)
     }
   }
 
@@ -72,22 +58,24 @@ export default function ChallengeSelector() {
     const now = Date.now()
 
     const newTimestamps = {}
-    const newTimers = {}
     drawn.forEach((card) => {
       newTimestamps[card.id] = now
-      newTimers[card.id] = TIMER_DURATION
     })
 
     setDrawnCards(drawn)
     setCardTimestamps(newTimestamps)
-    setTimers(newTimers)
-
     saveToStorage(drawn, newTimestamps, history)
+  }
+
+  const getTimeRemaining = (cardId) => {
+    if (!cardTimestamps[cardId]) return TIMER_DURATION
+    const elapsed = Math.floor((Date.now() - cardTimestamps[cardId]) / 1000)
+    return Math.max(0, TIMER_DURATION - elapsed)
   }
 
   const handleCompleteCard = (cardId) => {
     const completedCard = drawnCards.find(c => c.id === cardId)
-    const timeLeftWhenCompleted = timers[cardId]
+    const timeLeftWhenCompleted = getTimeRemaining(cardId)
     const newHistory = [
       { ...completedCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted },
       ...history,
@@ -184,36 +172,39 @@ export default function ChallengeSelector() {
 
       {drawnCards && (
         <div className={`grid gap-6 ${drawnCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-          {drawnCards.map((card) => (
-            <div
-              key={card.id}
-              className={`bg-gradient-to-r ${getCategoryColor(card)} rounded-xl p-8 text-white shadow-2xl flex flex-col`}
-            >
-              <div className="space-y-4 flex-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-sm font-bold opacity-90">{getCategoryLabel(card)} #{card.id}</div>
-                    <h2 className="text-3xl font-bold mt-2">{card.title}</h2>
-                  </div>
-                  <div className={`text-right text-2xl font-bold ${(timers[card.id] || 0) < 300 ? 'animate-pulse' : ''}`}>
-                    {formatTime(timers[card.id] || TIMER_DURATION)}
-                  </div>
-                </div>
-                <p className="text-lg leading-relaxed opacity-95">{card.description}</p>
-                {card.points !== null && (
-                  <div className="pt-4 border-t border-white border-opacity-30">
-                    <span className="text-2xl font-bold">+{card.points} pts</span>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => handleCompleteCard(card.id)}
-                className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+          {drawnCards.map((card) => {
+            const timeRemaining = getTimeRemaining(card.id)
+            return (
+              <div
+                key={card.id}
+                className={`bg-gradient-to-r ${getCategoryColor(card)} rounded-xl p-8 text-white shadow-2xl flex flex-col`}
               >
-                ✓ Complete
-              </button>
-            </div>
-          ))}
+                <div className="space-y-4 flex-1">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-sm font-bold opacity-90">{getCategoryLabel(card)} #{card.id}</div>
+                      <h2 className="text-3xl font-bold mt-2">{card.title}</h2>
+                    </div>
+                    <div className={`text-right text-2xl font-bold ${timeRemaining < 300 ? 'animate-pulse' : ''}`}>
+                      {formatTime(timeRemaining)}
+                    </div>
+                  </div>
+                  <p className="text-lg leading-relaxed opacity-95">{card.description}</p>
+                  {card.points !== null && (
+                    <div className="pt-4 border-t border-white border-opacity-30">
+                      <span className="text-2xl font-bold">+{card.points} pts</span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleCompleteCard(card.id)}
+                  className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+                >
+                  ✓ Complete
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
