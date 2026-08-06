@@ -72,7 +72,7 @@ export default function ChallengeSelector() {
 
   const drawInitialCards = () => {
     const now = Date.now()
-    const drawn = getRandomCards(ALL_CARDS)
+    const drawn = getRandomCards(CHALLENGES)
     const newTimestamps = {}
     drawn.forEach((card) => {
       newTimestamps[card.id] = now
@@ -95,7 +95,7 @@ export default function ChallengeSelector() {
   }
 
   const drawReplacementCard = (cards, timestamps, hist) => {
-    const drawn = getRandomCards(ALL_CARDS)
+    const drawn = getRandomCards(CHALLENGES)
     const now = Date.now()
     const newCards = [...cards, drawn[0]]
     const newTimestamps = { ...timestamps, [drawn[0].id]: now }
@@ -322,7 +322,7 @@ export default function ChallengeSelector() {
         <button
           onClick={() => {
             localStorage.removeItem(STORAGE_KEY)
-            const drawn = getRandomCards(ALL_CARDS)
+            const drawn = getRandomCards(CHALLENGES)
             const now = Date.now()
             const newTimestamps = {}
             drawn.forEach((card) => {
