@@ -140,9 +140,10 @@ export default function ChallengeSelector() {
   }
 
   const getTimeRemainingForCurse = () => {
-    if (!curseTimestamp) return TIMER_DURATION
+    if (!curseTimestamp || !activeCurse) return TIMER_DURATION
+    const curseDuration = activeCurse.timerSeconds || TIMER_DURATION
     const elapsed = Math.floor((Date.now() - curseTimestamp) / 1000)
-    return Math.max(0, TIMER_DURATION - elapsed)
+    return Math.max(0, curseDuration - elapsed)
   }
 
   const handleCompleteCurse = () => {
@@ -249,9 +250,14 @@ export default function ChallengeSelector() {
                 </div>
                 <button
                   onClick={() => handleCompleteCard(card.id)}
-                  className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+                  disabled={activeCurse && activeCurse.isBlocking}
+                  className={`mt-6 w-full font-bold py-3 px-4 rounded-lg transition border ${
+                    activeCurse && activeCurse.isBlocking
+                      ? 'bg-white bg-opacity-10 text-white text-opacity-50 border-white border-opacity-10 cursor-not-allowed'
+                      : 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white border border-white border-opacity-30'
+                  }`}
                 >
-                  ✓ Complete
+                  {activeCurse && activeCurse.isBlocking ? '🔒 Blocked by curse' : '✓ Complete'}
                 </button>
               </div>
             )
