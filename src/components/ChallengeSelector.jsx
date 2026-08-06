@@ -6,7 +6,6 @@ const TIMER_DURATION = 3600
 
 export default function ChallengeSelector() {
   const [drawnCards, setDrawnCards] = useState(null)
-  const [activeCard, setActiveCard] = useState(null)
   const [drawnTime, setDrawnTime] = useState(null)
   const [timeLeft, setTimeLeft] = useState(TIMER_DURATION)
   const [history, setHistory] = useState([])
@@ -37,7 +36,6 @@ export default function ChallengeSelector() {
     if (saved) {
       const state = JSON.parse(saved)
       setDrawnCards(state.drawnCards)
-      setActiveCard(state.activeCard)
       setDrawnTime(state.drawnTime)
       setHistory(state.history)
 
@@ -68,44 +66,40 @@ export default function ChallengeSelector() {
     const now = Date.now()
 
     setDrawnCards(drawn)
-    setActiveCard(drawn[0])
     setDrawnTime(now)
     setTimeLeft(TIMER_DURATION)
 
     saveToStorage({
       drawnCards: drawn,
-      activeCard: drawn[0],
       drawnTime: now,
       history,
     })
   }
 
-  const handleCompleteCard = () => {
+  const handleCompleteCard = (cardId) => {
+    const completedCard = drawnCards.find(c => c.id === cardId)
     const newHistory = [
-      { ...activeCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted: timeLeft },
+      { ...completedCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted: timeLeft },
       ...history,
     ]
 
-    const otherCard = drawnCards.find(c => c.id !== activeCard.id)
+    const remaining = drawnCards.filter(c => c.id !== cardId)
 
-    if (otherCard) {
-      setActiveCard(otherCard)
+    if (remaining.length > 0) {
+      setDrawnCards(remaining)
       saveToStorage({
-        drawnCards,
-        activeCard: otherCard,
+        drawnCards: remaining,
         drawnTime,
         history: newHistory,
       })
     } else {
       setDrawnCards(null)
-      setActiveCard(null)
       setDrawnTime(null)
       setTimeLeft(TIMER_DURATION)
       setHistory(newHistory)
 
       saveToStorage({
         drawnCards: null,
-        activeCard: null,
         drawnTime: null,
         history: newHistory,
       })
@@ -130,116 +124,102 @@ export default function ChallengeSelector() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const getWaitingCard = () => {
-    if (!drawnCards || !activeCard) return null
-    return drawnCards.find(c => c.id !== activeCard.id)
-  }
-
-  const waitingCard = getWaitingCard()
-
   return (
     <div className="space-y-6">
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => setCategory('all')}
-          disabled={!!activeCard}
+          disabled={!!drawnCards}
           className={`px-4 py-2 rounded-lg font-semibold transition ${
             category === 'all'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${activeCard ? 'opacity-50 cursor-not-allowed' : ''}`}
+          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           All Cards
         </button>
         <button
           onClick={() => setCategory('challenges')}
-          disabled={!!activeCard}
+          disabled={!!drawnCards}
           className={`px-4 py-2 rounded-lg font-semibold transition ${
             category === 'challenges'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${activeCard ? 'opacity-50 cursor-not-allowed' : ''}`}
+          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           Challenges
         </button>
         <button
           onClick={() => setCategory('curses')}
-          disabled={!!activeCard}
+          disabled={!!drawnCards}
           className={`px-4 py-2 rounded-lg font-semibold transition ${
             category === 'curses'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${activeCard ? 'opacity-50 cursor-not-allowed' : ''}`}
+          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           Curses
         </button>
         <button
           onClick={() => setCategory('special')}
-          disabled={!!activeCard}
+          disabled={!!drawnCards}
           className={`px-4 py-2 rounded-lg font-semibold transition ${
             category === 'special'
               ? 'bg-blue-600 text-white'
               : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-          } ${activeCard ? 'opacity-50 cursor-not-allowed' : ''}`}
+          } ${drawnCards ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           Special Cards
         </button>
       </div>
 
-      <div className="space-y-4">
-        {activeCard && (
-          <div className={`bg-gradient-to-r ${getCategoryColor(activeCard)} rounded-xl p-8 text-white shadow-2xl`}>
-            <div className="space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-sm font-bold opacity-90">{getCategoryLabel(activeCard)} #{activeCard.id}</div>
-                  <h2 className="text-4xl font-bold mt-2">{activeCard.title}</h2>
-                </div>
-                <div className={`text-right text-3xl font-bold ${timeLeft < 300 ? 'animate-pulse' : ''}`}>
-                  {formatTime(timeLeft)}
-                </div>
+      {drawnCards && (
+        <div className="flex justify-between items-start gap-2">
+          <div className={`text-4xl font-bold ${timeLeft < 300 ? 'animate-pulse text-red-600' : 'text-gray-800'}`}>
+            {formatTime(timeLeft)}
+          </div>
+          <div className="text-sm text-gray-600">
+            {drawnCards.length} card{drawnCards.length !== 1 ? 's' : ''} remaining
+          </div>
+        </div>
+      )}
+
+      {drawnCards && (
+        <div className={`grid gap-6 ${drawnCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+          {drawnCards.map((card) => (
+            <div
+              key={card.id}
+              className={`bg-gradient-to-r ${getCategoryColor(card)} rounded-xl p-8 text-white shadow-2xl flex flex-col`}
+            >
+              <div className="space-y-4 flex-1">
+                <div className="text-sm font-bold opacity-90">{getCategoryLabel(card)} #{card.id}</div>
+                <h2 className="text-3xl font-bold">{card.title}</h2>
+                <p className="text-lg leading-relaxed opacity-95">{card.description}</p>
+                {card.points !== null && (
+                  <div className="pt-4 border-t border-white border-opacity-30">
+                    <span className="text-2xl font-bold">+{card.points} pts</span>
+                  </div>
+                )}
               </div>
-              <p className="text-lg leading-relaxed opacity-95">{activeCard.description}</p>
-              {activeCard.points !== null && (
-                <div className="pt-4 border-t border-white border-opacity-30">
-                  <span className="text-2xl font-bold">+{activeCard.points} pts</span>
-                </div>
-              )}
+              <button
+                onClick={() => handleCompleteCard(card.id)}
+                className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+              >
+                ✓ Complete
+              </button>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {waitingCard && (
-          <div className={`bg-gradient-to-r ${getCategoryColor(waitingCard)} rounded-xl p-6 text-white shadow-lg opacity-60`}>
-            <div className="space-y-2">
-              <div className="text-sm font-bold opacity-90">{getCategoryLabel(waitingCard)} #{waitingCard.id}</div>
-              <h3 className="text-2xl font-bold">{waitingCard.title}</h3>
-              <p className="text-sm leading-relaxed opacity-95">{waitingCard.description}</p>
-              <div className="text-xs pt-2 opacity-75">Waiting - Same timer: {formatTime(timeLeft)}</div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        {!activeCard && !drawnCards && (
-          <button
-            onClick={handleDrawCards}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition"
-          >
-            Draw 2 Cards
-          </button>
-        )}
-
-        {activeCard && (
-          <button
-            onClick={handleCompleteCard}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition"
-          >
-            ✓ Challenge Complete {waitingCard ? '→ Next Card' : ''}
-          </button>
-        )}
-      </div>
+      {!drawnCards && (
+        <button
+          onClick={handleDrawCards}
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg transition"
+        >
+          Draw 2 Cards
+        </button>
+      )}
 
       {history.length > 0 && (
         <div className="space-y-3">
