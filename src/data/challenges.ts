@@ -1,11 +1,22 @@
-export const SPECIAL_CARDS = [
+export interface Card {
+  id: number
+  title?: string
+  type?: string
+  effect?: string
+  description?: string
+  points: number | null
+  isBlocking?: boolean
+  timerSeconds?: number
+}
+
+export const SPECIAL_CARDS: Card[] = [
   { id: 1, type: 'steal', effect: 'Steal 10 coins from another team', points: 10 },
   { id: 2, type: 'steal', effect: 'Steal 20 coins from another team', points: 20 },
   { id: 3, type: 'steal', effect: 'Steal 30 coins from another team', points: 30 },
   { id: 4, type: 'travel', effect: 'Travel the next 10 min for free', points: 0 },
 ]
 
-export const CHALLENGES = [
+export const CHALLENGES: Card[] = [
   { id: 5, title: 'Taste test', description: 'Try one gummy bear with eyes closed; then state which flavour it was. You have 3 attempts to guess correctly, else you lose.', points: 10 },
   { id: 6, title: 'Pfand challenge', description: 'Get a bottle of any beverage and get your Pfand back in a different district.', points: 15 },
   { id: 7, title: 'Cross the wall', description: 'Take any train connection that crosses the old East-West border (you may use this line for free for the rest of the game).', points: 0 },
@@ -93,7 +104,7 @@ export const CHALLENGES = [
   { id: 89, title: 'Category master', description: 'Announce 10 different kinds of ONE of the following categories (you choose): Flowers, Pokémon, car brands, European countries, or German cities.', points: 8 },
 ]
 
-export const CURSES = [
+export const CURSES: Card[] = [
   { id: 90, title: 'Train Roulette', description: 'Go to the next U-Bahn or S-Bahn station and take the very next train. You may use a bus for free to reach the first train station if a foot walk would take longer than 10 minutes. You\'re only permitted to leave the train once you have (while sitting on the train): 1. taken a photo of a bus; 2. taken a photo of a person wearing a hat; and 3. taken a photo of another train.', points: 0, isBlocking: true },
   { id: 91, title: 'Slow Down', description: 'For the next 20 minutes, you may only use buses and trams. Don\'t run for the next 20 minutes.', points: 0, isBlocking: false, timerSeconds: 1200 },
   { id: 92, title: 'Hurry Up', description: 'For the next 20 minutes, you may only use S- and U-Bahn.', points: 0, isBlocking: false, timerSeconds: 1200 },
@@ -106,7 +117,7 @@ export const CURSES = [
   { id: 99, title: 'Second Guesser', description: 'For the next 20 minutes, whenever you choose the next mode of transport, flip a coin. If you guessed wrong, you have to choose a different route. (Not applicable if you are in a location with only one line.)', points: 0, isBlocking: false, timerSeconds: 1200 },
 ]
 
-export const ALL_CARDS = [
+export const ALL_CARDS: Card[] = [
   ...SPECIAL_CARDS,
   ...CHALLENGES,
   ...CURSES,
