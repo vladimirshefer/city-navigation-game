@@ -14,6 +14,7 @@ export default function ChallengeSelector() {
   const [curseTimestamp, setCurseTimestamp] = useState(null)
   const [gameStartTime, setGameStartTime] = useState(null)
   const [lastCurseTime, setLastCurseTime] = useState(null)
+  const [coins, setCoins] = useState(0)
 
   useEffect(() => {
     const loaded = loadFromStorage()
@@ -43,6 +44,7 @@ export default function ChallengeSelector() {
       setCurseTimestamp(state.curseTimestamp || null)
       setGameStartTime(state.gameStartTime || null)
       setLastCurseTime(state.lastCurseTime || null)
+      setCoins(state.coins || 0)
       return true
     }
     return false
@@ -90,10 +92,10 @@ export default function ChallengeSelector() {
     setCardTimestamps(newTimestamps)
     setActiveCurse(curse)
     setCurseTimestamp(curseTs)
-    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now)
+    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0)
   }
 
-  const drawReplacementCard = (cards, timestamps, hist) => {
+  const drawReplacementCard = (cards, timestamps, hist, coinsValue = coins) => {
     const drawn = getRandomCards(CHALLENGES)
     const now = Date.now()
     const newCards = [...cards, drawn[0]]
@@ -113,10 +115,10 @@ export default function ChallengeSelector() {
     setCardTimestamps(newTimestamps)
     setActiveCurse(curse)
     setCurseTimestamp(curseTs)
-    saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse)
+    saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse, coinsValue)
   }
 
-  const saveToStorage = (cards, timestamps, hist, curse = null, curseTs = null, startTime = null, lastCurseTs = null) => {
+  const saveToStorage = (cards, timestamps, hist, curse = null, curseTs = null, startTime = null, lastCurseTs = null, coinsValue = coins) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       drawnCards: cards,
       cardTimestamps: timestamps,
@@ -125,6 +127,7 @@ export default function ChallengeSelector() {
       curseTimestamp: curseTs,
       gameStartTime: startTime,
       lastCurseTime: lastCurseTs,
+      coins: coinsValue,
     }))
   }
 
@@ -159,7 +162,7 @@ export default function ChallengeSelector() {
     setCurseTimestamp(null)
     setLastCurseTime(now)
     setHistory(newHistory)
-    saveToStorage(drawnCards, cardTimestamps, newHistory, null, null, gameStartTime, now)
+    saveToStorage(drawnCards, cardTimestamps, newHistory, null, null, gameStartTime, now, coins)
   }
 
   const handleCompleteCard = (cardId) => {
@@ -174,8 +177,12 @@ export default function ChallengeSelector() {
     const newTimestamps = { ...cardTimestamps }
     delete newTimestamps[cardId]
 
+    const earnedCoins = completedCard.points || 0
+    const newCoins = coins + earnedCoins
+    setCoins(newCoins)
+
     setHistory(newHistory)
-    drawReplacementCard(remaining, newTimestamps, newHistory)
+    drawReplacementCard(remaining, newTimestamps, newHistory, newCoins)
   }
 
   const getCategoryColor = (card) => {
@@ -198,6 +205,10 @@ export default function ChallengeSelector() {
 
   return (
     <div className="space-y-6">
+      <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg p-4 text-center shadow-lg">
+        <div className="text-sm font-bold text-gray-800 opacity-90">COINS</div>
+        <div className="text-4xl font-bold text-gray-900 mt-1">💰 {coins}</div>
+      </div>
 
       {activeCurse && (
         <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-red-700">
@@ -290,7 +301,8 @@ export default function ChallengeSelector() {
             setCurseTimestamp(curseTs)
             setGameStartTime(now)
             setLastCurseTime(now)
-            saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now)
+            setCoins(0)
+            saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 0)
           }}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition"
         >
