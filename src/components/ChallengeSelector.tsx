@@ -1,152 +1,64 @@
 import { useState, useEffect } from 'react'
-import { ALL_CARDS, CHALLENGES, CURSES, SPECIAL_CARDS, Card } from '../data/challenges'
+import { CHALLENGES, CURSES, Card } from '../data/challenges'
 
 const STORAGE_KEY = 'berlin-game-state'
 const TIMER_DURATION = 3600
-const CURSE_INTERVAL = 7200000
+
+type DrawableCard = Card & { drawnAt: number }
 
 interface GameState {
-  drawnCards: Card[] | null
-  cardTimestamps: Record<number, number>
+  drawnCards: DrawableCard[]
   history: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]
   coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[]
   activeCurse: Card | null
-  curseTimestamp: number | null
-  gameStartTime: number | null
-  lastCurseTime: number | null
+  curseAt: number | null
   coins: number
 }
 
 export default function ChallengeSelector() {
-  const [drawnCards, setDrawnCards] = useState<Card[] | null>(null)
-  const [cardTimestamps, setCardTimestamps] = useState<Record<number, number>>({})
-  const [, setTickCount] = useState(0)
-  const [history, setHistory] = useState<(Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]>([])
-  const [coinEdits, setCoinEdits] = useState<{ timestamp: string; previousAmount: number; newAmount: number; comment: string }[]>([])
-  const [activeCurse, setActiveCurse] = useState<Card | null>(null)
-  const [curseTimestamp, setCurseTimestamp] = useState<number | null>(null)
-  const [gameStartTime, setGameStartTime] = useState<number | null>(null)
-  const [lastCurseTime, setLastCurseTime] = useState<number | null>(null)
-  const [coins, setCoins] = useState(0)
+  const [gameState, setGameState] = useState<GameState>({
+    drawnCards: [],
+    history: [],
+    coinEdits: [],
+    activeCurse: null,
+    curseAt: null,
+    coins: 0,
+  })
+  const [, setTick] = useState(0)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editAmount, setEditAmount] = useState('')
   const [editComment, setEditComment] = useState('')
 
   useEffect(() => {
-    const loaded = loadFromStorage()
-    if (!loaded) {
-      drawInitialCards()
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      setGameState(JSON.parse(saved))
+    } else {
+      initializeGame()
     }
   }, [])
 
   useEffect(() => {
-    if ((!drawnCards || drawnCards.length === 0) && !activeCurse) return
-
-    const interval = setInterval(() => {
-      setTickCount((prev) => prev + 1)
-    }, 1000)
-
+    if (gameState.drawnCards.length === 0 && !gameState.activeCurse) return
+    const interval = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(interval)
-  }, [drawnCards, activeCurse])
+  }, [gameState.drawnCards.length, gameState.activeCurse])
 
-  const loadFromStorage = (): boolean => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const state: GameState = JSON.parse(saved)
-      setDrawnCards(state.drawnCards)
-      setCardTimestamps(state.cardTimestamps || {})
-      setHistory(state.history)
-      setCoinEdits(state.coinEdits || [])
-      setActiveCurse(state.activeCurse || null)
-      setCurseTimestamp(state.curseTimestamp || null)
-      setGameStartTime(state.gameStartTime || null)
-      setLastCurseTime(state.lastCurseTime || null)
-      setCoins(state.coins || 0)
-      return true
-    }
-    return false
+  const saveState = (newState: GameState) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newState))
+    setGameState(newState)
   }
 
-  const getCurseProbability = (referenceTime: number): number => {
-    const timeReference = lastCurseTime || referenceTime
-    const elapsedMs = Date.now() - timeReference
-    const elapsedMins = elapsedMs / 60000
-
-    if (elapsedMins >= 120) return 0.9
-    if (elapsedMins <= 0) return 0.1
-
-    return 0.1 + (elapsedMins / 120) * 0.8
-  }
-
-  const shouldDrawCurse = (referenceTime: number): boolean => {
-    const probability = getCurseProbability(referenceTime)
-    return Math.random() < probability
-  }
-
-  const drawCurseCard = (): Card => {
-    const randomCurse = CURSES[Math.floor(Math.random() * CURSES.length)]
-    return randomCurse
-  }
-
-  const drawInitialCards = (): void => {
-    const now = Date.now()
-    const drawn = getRandomCards(CHALLENGES)
-    const newTimestamps: Record<number, number> = {}
-    drawn.forEach((card) => {
-      newTimestamps[card.id] = now
+  const initializeGame = () => {
+    const drawn = getRandomCards(CHALLENGES).map(card => ({ ...card, drawnAt: Date.now() }))
+    saveState({
+      drawnCards: drawn,
+      history: [],
+      coinEdits: [],
+      activeCurse: null,
+      curseAt: null,
+      coins: 0,
     })
-
-    let curse: Card | null = null
-    let curseTs: number | null = null
-    if (shouldDrawCurse(now)) {
-      curse = drawCurseCard()
-      curseTs = now
-    }
-
-    setGameStartTime(now)
-    setLastCurseTime(lastCurseTime || now)
-    setDrawnCards(drawn)
-    setCardTimestamps(newTimestamps)
-    setActiveCurse(curse)
-    setCurseTimestamp(curseTs)
-    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0)
-  }
-
-  const drawReplacementCard = (cards: Card[], timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], coinsValue: number = coins): void => {
-    const drawn = getRandomCards(CHALLENGES)
-    const now = Date.now()
-    const newCards = [...cards, drawn[0]]
-    const newTimestamps = { ...timestamps, [drawn[0].id]: now }
-
-    let curse: Card | null = activeCurse
-    let curseTs: number | null = curseTimestamp
-    let lastCurse: number | null = lastCurseTime
-
-    if (!activeCurse && shouldDrawCurse(lastCurseTime || gameStartTime || now)) {
-      curse = drawCurseCard()
-      curseTs = now
-      lastCurse = lastCurseTime
-    }
-
-    setDrawnCards(newCards)
-    setCardTimestamps(newTimestamps)
-    setActiveCurse(curse)
-    setCurseTimestamp(curseTs)
-    saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse, coinsValue)
-  }
-
-  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      drawnCards: cards,
-      cardTimestamps: timestamps,
-      history: hist,
-      coinEdits: edits,
-      activeCurse: curse,
-      curseTimestamp: curseTs,
-      gameStartTime: startTime,
-      lastCurseTime: lastCurseTs,
-      coins: coinsValue,
-    }))
   }
 
   const getRandomCards = (cards: Card[]): Card[] => {
@@ -154,55 +66,20 @@ export default function ChallengeSelector() {
     return [shuffled[0], shuffled[1]]
   }
 
-  const getTimeRemaining = (cardId: number): number => {
-    if (!cardTimestamps[cardId]) return TIMER_DURATION
-    const elapsed = Math.floor((Date.now() - cardTimestamps[cardId]) / 1000)
-    return Math.max(0, TIMER_DURATION - elapsed)
+  const shouldSpawnCurse = (): boolean => {
+    return !gameState.activeCurse && Math.random() < 0.3
   }
 
-  const getTimeRemainingForCurse = (): number => {
-    if (!curseTimestamp || !activeCurse) return TIMER_DURATION
-    const curseDuration = activeCurse.timerSeconds || TIMER_DURATION
-    const elapsed = Math.floor((Date.now() - curseTimestamp) / 1000)
-    return Math.max(0, curseDuration - elapsed)
+  const getTimeRemaining = (drawnAt: number, isTimer?: number): number => {
+    const duration = isTimer || TIMER_DURATION
+    const elapsed = Math.floor((Date.now() - drawnAt) / 1000)
+    return Math.max(0, duration - elapsed)
   }
 
-  const handleCompleteCurse = (): void => {
-    const completedCurse = activeCurse
-    const timeLeftWhenCompleted = getTimeRemainingForCurse()
-    const newHistory = [
-      { ...completedCurse, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: true } as Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean },
-      ...history,
-    ]
-
-    const now = Date.now()
-    setActiveCurse(null)
-    setCurseTimestamp(null)
-    setLastCurseTime(now)
-    setHistory(newHistory)
-    saveToStorage(drawnCards, cardTimestamps, newHistory, null, null, gameStartTime, now, coins)
-  }
-
-  const handleCompleteCard = (cardId: number): void => {
-    const completedCard = drawnCards?.find(c => c.id === cardId)
-    if (!completedCard) return
-
-    const timeLeftWhenCompleted = getTimeRemaining(cardId)
-    const newHistory = [
-      { ...completedCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: false } as Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean },
-      ...history,
-    ]
-
-    const remaining = drawnCards?.filter(c => c.id !== cardId) || []
-    const newTimestamps = { ...cardTimestamps }
-    delete newTimestamps[cardId]
-
-    const earnedCoins = completedCard.points || 0
-    const newCoins = coins + earnedCoins
-    setCoins(newCoins)
-
-    setHistory(newHistory)
-    drawReplacementCard(remaining, newTimestamps, newHistory, newCoins)
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
   const getCategoryColor = (card: Card): string => {
@@ -217,13 +94,52 @@ export default function ChallengeSelector() {
     return 'CHALLENGE'
   }
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+  const handleCompleteCard = (cardId: number) => {
+    const card = gameState.drawnCards.find(c => c.id === cardId)
+    if (!card) return
+
+    const timeLeftWhenCompleted = getTimeRemaining(card.drawnAt)
+    const newHistory = [
+      { ...card, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: false },
+      ...gameState.history,
+    ]
+
+    const remaining = gameState.drawnCards.filter(c => c.id !== cardId)
+    const newCoins = gameState.coins + (card.points || 0)
+    const replacement = getRandomCards(CHALLENGES)[0]
+    const newDrawn = [...remaining, { ...replacement, drawnAt: Date.now() }]
+
+    const spawnCurse = shouldSpawnCurse()
+    const newCurse = spawnCurse ? CURSES[Math.floor(Math.random() * CURSES.length)] : gameState.activeCurse
+
+    saveState({
+      ...gameState,
+      drawnCards: newDrawn,
+      history: newHistory,
+      coins: newCoins,
+      activeCurse: newCurse,
+      curseAt: spawnCurse ? Date.now() : gameState.curseAt,
+    })
   }
 
-  const handleSaveCoinEdit = (): void => {
+  const handleCompleteCurse = () => {
+    if (!gameState.activeCurse || !gameState.curseAt) return
+
+    const timeLeftWhenCompleted = getTimeRemaining(gameState.curseAt, gameState.activeCurse.timerSeconds)
+    const newHistory = [
+      { ...gameState.activeCurse, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: true },
+      ...gameState.history,
+    ]
+
+    saveState({
+      ...gameState,
+      history: newHistory,
+      activeCurse: null,
+      curseAt: null,
+    })
+  }
+
+  const handleSaveCoinEdit = () => {
     if (!editAmount || !editComment.trim()) {
       alert('Please enter both an amount and a comment')
       return
@@ -237,19 +153,23 @@ export default function ChallengeSelector() {
 
     const newEdit = {
       timestamp: new Date().toLocaleString(),
-      previousAmount: coins,
+      previousAmount: gameState.coins,
       newAmount,
       comment: editComment.trim(),
     }
 
-    const newEdits = [newEdit, ...coinEdits]
-    setCoins(newAmount)
-    setCoinEdits(newEdits)
-    saveToStorage(drawnCards, cardTimestamps, history, activeCurse, curseTimestamp, gameStartTime, lastCurseTime, newAmount, newEdits)
+    saveState({
+      ...gameState,
+      coins: newAmount,
+      coinEdits: [newEdit, ...gameState.coinEdits],
+    })
     setShowEditModal(false)
     setEditAmount('')
     setEditComment('')
   }
+
+  const { drawnCards, history, coinEdits, activeCurse, coins } = gameState
+  const curseTimeRemaining = activeCurse && gameState.curseAt ? getTimeRemaining(gameState.curseAt, activeCurse.timerSeconds) : 0
 
   return (
     <div className="space-y-6">
@@ -324,8 +244,8 @@ export default function ChallengeSelector() {
                 <div className="text-sm font-bold opacity-90 uppercase">⚠ CURSE #{activeCurse.id}</div>
                 <h2 className="text-3xl font-bold mt-2">{activeCurse.title}</h2>
               </div>
-              <div className={`text-right text-2xl font-bold ${getTimeRemainingForCurse() < 300 ? 'animate-pulse' : ''}`}>
-                {formatTime(getTimeRemainingForCurse())}
+              <div className={`text-right text-2xl font-bold ${curseTimeRemaining < 300 ? 'animate-pulse' : ''}`}>
+                {formatTime(curseTimeRemaining)}
               </div>
             </div>
             <p className="text-lg leading-relaxed opacity-95">{activeCurse.description}</p>
@@ -339,10 +259,10 @@ export default function ChallengeSelector() {
         </div>
       )}
 
-      {drawnCards && (
+      {drawnCards.length > 0 && (
         <div className={`grid gap-6 ${drawnCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
           {drawnCards.map((card) => {
-            const timeRemaining = getTimeRemaining(card.id)
+            const timeRemaining = getTimeRemaining(card.drawnAt)
             return (
               <div
                 key={card.id}
@@ -382,34 +302,9 @@ export default function ChallengeSelector() {
         </div>
       )}
 
-      {drawnCards && (
+      {drawnCards.length > 0 && (
         <button
-          onClick={() => {
-            localStorage.removeItem(STORAGE_KEY)
-            const drawn = getRandomCards(CHALLENGES)
-            const now = Date.now()
-            const newTimestamps: Record<number, number> = {}
-            drawn.forEach((card) => {
-              newTimestamps[card.id] = now
-            })
-
-            let curse: Card | null = null
-            let curseTs: number | null = null
-            if (shouldDrawCurse(now)) {
-              curse = drawCurseCard()
-              curseTs = now
-            }
-
-            setDrawnCards(drawn)
-            setCardTimestamps(newTimestamps)
-            setHistory([])
-            setActiveCurse(curse)
-            setCurseTimestamp(curseTs)
-            setGameStartTime(now)
-            setLastCurseTime(now)
-            setCoins(0)
-            saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 0)
-          }}
+          onClick={() => initializeGame()}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition"
         >
           New Game
