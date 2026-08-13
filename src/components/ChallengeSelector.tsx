@@ -9,6 +9,7 @@ interface GameState {
   drawnCards: Card[] | null
   cardTimestamps: Record<number, number>
   history: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]
+  coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[]
   activeCurse: Card | null
   curseTimestamp: number | null
   gameStartTime: number | null
@@ -21,11 +22,15 @@ export default function ChallengeSelector() {
   const [cardTimestamps, setCardTimestamps] = useState<Record<number, number>>({})
   const [, setTickCount] = useState(0)
   const [history, setHistory] = useState<(Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]>([])
+  const [coinEdits, setCoinEdits] = useState<{ timestamp: string; previousAmount: number; newAmount: number; comment: string }[]>([])
   const [activeCurse, setActiveCurse] = useState<Card | null>(null)
   const [curseTimestamp, setCurseTimestamp] = useState<number | null>(null)
   const [gameStartTime, setGameStartTime] = useState<number | null>(null)
   const [lastCurseTime, setLastCurseTime] = useState<number | null>(null)
   const [coins, setCoins] = useState(0)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editAmount, setEditAmount] = useState('')
+  const [editComment, setEditComment] = useState('')
 
   useEffect(() => {
     const loaded = loadFromStorage()
@@ -51,6 +56,7 @@ export default function ChallengeSelector() {
       setDrawnCards(state.drawnCards)
       setCardTimestamps(state.cardTimestamps || {})
       setHistory(state.history)
+      setCoinEdits(state.coinEdits || [])
       setActiveCurse(state.activeCurse || null)
       setCurseTimestamp(state.curseTimestamp || null)
       setGameStartTime(state.gameStartTime || null)
@@ -129,11 +135,12 @@ export default function ChallengeSelector() {
     saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse, coinsValue)
   }
 
-  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins): void => {
+  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       drawnCards: cards,
       cardTimestamps: timestamps,
       history: hist,
+      coinEdits: edits,
       activeCurse: curse,
       curseTimestamp: curseTs,
       gameStartTime: startTime,
@@ -216,12 +223,98 @@ export default function ChallengeSelector() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  const handleSaveCoinEdit = (): void => {
+    if (!editAmount || !editComment.trim()) {
+      alert('Please enter both an amount and a comment')
+      return
+    }
+
+    const newAmount = parseInt(editAmount, 10)
+    if (isNaN(newAmount)) {
+      alert('Please enter a valid number')
+      return
+    }
+
+    const newEdit = {
+      timestamp: new Date().toLocaleString(),
+      previousAmount: coins,
+      newAmount,
+      comment: editComment.trim(),
+    }
+
+    const newEdits = [newEdit, ...coinEdits]
+    setCoins(newAmount)
+    setCoinEdits(newEdits)
+    saveToStorage(drawnCards, cardTimestamps, history, activeCurse, curseTimestamp, gameStartTime, lastCurseTime, newAmount, newEdits)
+    setShowEditModal(false)
+    setEditAmount('')
+    setEditComment('')
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg p-4 text-center shadow-lg">
-        <div className="text-sm font-bold text-gray-800 opacity-90">COINS</div>
-        <div className="text-4xl font-bold text-gray-900 mt-1">💰 {coins}</div>
+        <div className="flex justify-between items-center">
+          <div className="flex-1">
+            <div className="text-sm font-bold text-gray-800 opacity-90">COINS</div>
+            <div className="text-4xl font-bold text-gray-900 mt-1">💰 {coins}</div>
+          </div>
+          <button
+            onClick={() => setShowEditModal(true)}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-3 rounded transition text-sm"
+          >
+            ✏️ Edit
+          </button>
+        </div>
       </div>
+
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Edit Coins</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">New Amount</label>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  placeholder={coins.toString()}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Comment (required)</label>
+                <textarea
+                  value={editComment}
+                  onChange={(e) => setEditComment(e.target.value)}
+                  placeholder="Why are you changing this?"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditAmount('')
+                    setEditComment('')
+                  }}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCoinEdit}
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeCurse && (
         <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-red-700">
@@ -340,6 +433,24 @@ export default function ChallengeSelector() {
                 <div className="text-xs text-gray-600 mt-1">
                   {card.completedAt} · {card.points !== null ? `+${card.points} pts` : 'Variable points'} · {formatTime(card.timeLeftWhenCompleted)} remaining
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {coinEdits.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold text-gray-800">Coin Edit History</h3>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {coinEdits.map((edit, idx) => (
+              <div
+                key={idx}
+                className="p-3 rounded-lg text-sm border-l-4 bg-yellow-50 text-gray-700 border-yellow-500"
+              >
+                <div className="font-semibold">{edit.previousAmount} → {edit.newAmount} coins</div>
+                <div className="text-xs text-gray-600 mt-1">{edit.timestamp}</div>
+                <div className="text-xs text-gray-700 mt-2 italic">"{edit.comment}"</div>
               </div>
             ))}
           </div>
