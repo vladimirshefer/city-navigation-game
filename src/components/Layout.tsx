@@ -6,7 +6,10 @@ export default function Layout() {
       <nav className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex gap-6">
           <Link to="/" className="font-semibold text-blue-600 hover:text-blue-800">
-            David
+            Game
+          </Link>
+          <Link to="/profiles" className="text-gray-600 hover:text-gray-900">
+            Profiles
           </Link>
           <Link to="/about" className="text-gray-600 hover:text-gray-900">
             Map

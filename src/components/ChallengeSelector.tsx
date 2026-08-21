@@ -1,27 +1,9 @@
 import { useState, useEffect } from 'react'
 import { CHALLENGES, CURSES, Card } from '../data/challenges'
+import { createGameProfile, getActiveProfile, saveActiveGameState } from '../data/profiles'
+import type { GameState, HistoryCard } from '../data/profiles'
 
-const STORAGE_KEY = 'berlin-game-state'
 const TIMER_DURATION = 3600
-
-type HistoryCard = Card & {
-  completedAt: string
-  timeLeftWhenCompleted: number
-  isCurse: boolean
-  status?: 'completed' | 'expired'
-}
-
-interface GameState {
-  drawnCards: Card[] | null
-  cardTimestamps: Record<number, number>
-  history: HistoryCard[]
-  coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[]
-  activeCurse: Card | null
-  curseTimestamp: number | null
-  gameStartTime: number | null
-  lastCurseTime: number | null
-  coins: number
-}
 
 export default function ChallengeSelector() {
   const [drawnCards, setDrawnCards] = useState<Card[] | null>(null)
@@ -35,6 +17,7 @@ export default function ChallengeSelector() {
   const [gameStartTime, setGameStartTime] = useState<number | null>(null)
   const [lastCurseTime, setLastCurseTime] = useState<number | null>(null)
   const [coins, setCoins] = useState(0)
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editAmount, setEditAmount] = useState('')
   const [editComment, setEditComment] = useState('')
@@ -61,21 +44,21 @@ export default function ChallengeSelector() {
   }, [tickCount])
 
   const loadFromStorage = (): boolean => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const state: GameState = JSON.parse(saved)
-      setDrawnCards(state.drawnCards)
-      setCardTimestamps(state.cardTimestamps || {})
-      setHistory(state.history)
-      setCoinEdits(state.coinEdits || [])
-      setActiveCurse(state.activeCurse || null)
-      setCurseTimestamp(state.curseTimestamp || null)
-      setGameStartTime(state.gameStartTime || null)
-      setLastCurseTime(state.lastCurseTime || null)
-      setCoins(state.coins || 0)
-      return true
-    }
-    return false
+    const activeProfile = getActiveProfile()
+    if (!activeProfile) return false
+
+    const state = activeProfile.state
+    setActiveProfileId(activeProfile.id)
+    setDrawnCards(state.drawnCards)
+    setCardTimestamps(state.cardTimestamps || {})
+    setHistory(state.history || [])
+    setCoinEdits(state.coinEdits || [])
+    setActiveCurse(state.activeCurse || null)
+    setCurseTimestamp(state.curseTimestamp ?? null)
+    setGameStartTime(state.gameStartTime ?? null)
+    setLastCurseTime(state.lastCurseTime ?? null)
+    setCoins(state.coins ?? 0)
+    return true
   }
 
   const getCurseProbability = (referenceTime: number): number => {
@@ -121,6 +104,7 @@ export default function ChallengeSelector() {
     setActiveCurse(curse)
     setCurseTimestamp(curseTs)
     saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0)
+    setActiveProfileId(getActiveProfile()?.id || null)
   }
 
   const drawReplacementCard = (cards: Card[], timestamps: Record<number, number>, hist: HistoryCard[], coinsValue: number = coins): void => {
@@ -147,7 +131,7 @@ export default function ChallengeSelector() {
   }
 
   const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: HistoryCard[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    const state: GameState = {
       drawnCards: cards,
       cardTimestamps: timestamps,
       history: hist,
@@ -157,7 +141,8 @@ export default function ChallengeSelector() {
       gameStartTime: startTime,
       lastCurseTime: lastCurseTs,
       coins: coinsValue,
-    }))
+    }
+    saveActiveGameState(state)
   }
 
   const getRandomCards = (cards: Card[]): Card[] => {
@@ -318,6 +303,7 @@ export default function ChallengeSelector() {
           <div className="flex-1">
             <div className="text-sm font-bold text-gray-800 opacity-90">COINS</div>
             <div className="text-4xl font-bold text-gray-900 mt-1">💰 {coins}</div>
+            <div className="text-xs text-gray-700 mt-1">Profile: {activeProfileId || 'loading'}</div>
           </div>
           <button
             onClick={() => setShowEditModal(true)}
@@ -459,7 +445,6 @@ export default function ChallengeSelector() {
       {drawnCards && (
         <button
           onClick={() => {
-            localStorage.removeItem(STORAGE_KEY)
             const drawn = getRandomCards(CHALLENGES)
             const now = Date.now()
             const newTimestamps: Record<number, number> = {}
@@ -477,16 +462,29 @@ export default function ChallengeSelector() {
             setDrawnCards(drawn)
             setCardTimestamps(newTimestamps)
             setHistory([])
+            setCoinEdits([])
             setActiveCurse(curse)
             setCurseTimestamp(curseTs)
             setGameStartTime(now)
             setLastCurseTime(now)
             setCoins(0)
-            saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 0)
+            setFailedBackgroundImages(new Set())
+            const newProfile = createGameProfile({
+              drawnCards: drawn,
+              cardTimestamps: newTimestamps,
+              history: [],
+              coinEdits: [],
+              activeCurse: curse,
+              curseTimestamp: curseTs,
+              gameStartTime: now,
+              lastCurseTime: now,
+              coins: 0,
+            })
+            setActiveProfileId(newProfile.id)
           }}
           className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition"
         >
-          New Game
+          New Game (New Profile)
         </button>
       )}
 
