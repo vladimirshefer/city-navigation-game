@@ -127,12 +127,17 @@ export default function ChallengeSelector() {
     }
 
     setGameStartTime(now);
-    setLastCurseTime(lastCurseTime || now);
+    setLastCurseTime(now);
     setDrawnCards(drawn);
     setCardTimestamps(newTimestamps);
+    setHistory([]);
+    setCoinEdits([]);
     setActiveCurse(curse);
     setCurseTimestamp(curseTs);
-    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0);
+    setCoins(0);
+    setActiveFahrkarte(null);
+    setFahrkartenHistory([]);
+    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 0, [], null, []);
   };
 
   const drawReplacementCard = (
