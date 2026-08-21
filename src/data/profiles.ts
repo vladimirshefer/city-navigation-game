@@ -1,8 +1,8 @@
 import { Card } from './challenges';
 
-export const PROFILES_STORAGE_KEY = 'berlin-game-profiles';
-export const ACTIVE_PROFILE_STORAGE_KEY = 'berlin-active-profile';
-const LEGACY_STORAGE_KEY = 'berlin-game-state';
+export const PROFILES_STORAGE_KEY = 'berlin-game-profiles-v2';
+export const ACTIVE_PROFILE_STORAGE_KEY = 'berlin-active-profile-v2';
+const LEGACY_STORAGE_KEY = 'berlin-game-state-v2';
 
 export type HistoryCard = Card & {
   completedAt: string;
