@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react'
-import { ALL_CARDS, CHALLENGES, CURSES, SPECIAL_CARDS, Card } from '../data/challenges'
+import { CHALLENGES, CURSES, Card } from '../data/challenges'
 
 const STORAGE_KEY = 'berlin-game-state'
 const TIMER_DURATION = 3600
-const CURSE_INTERVAL = 7200000
+
+type HistoryCard = Card & {
+  completedAt: string
+  timeLeftWhenCompleted: number
+  isCurse: boolean
+  status?: 'completed' | 'expired'
+}
 
 interface GameState {
   drawnCards: Card[] | null
   cardTimestamps: Record<number, number>
-  history: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]
+  history: HistoryCard[]
   coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[]
   activeCurse: Card | null
   curseTimestamp: number | null
@@ -20,11 +26,12 @@ interface GameState {
 export default function ChallengeSelector() {
   const [drawnCards, setDrawnCards] = useState<Card[] | null>(null)
   const [cardTimestamps, setCardTimestamps] = useState<Record<number, number>>({})
-  const [, setTickCount] = useState(0)
-  const [history, setHistory] = useState<(Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[]>([])
+  const [tickCount, setTickCount] = useState(0)
+  const [history, setHistory] = useState<HistoryCard[]>([])
   const [coinEdits, setCoinEdits] = useState<{ timestamp: string; previousAmount: number; newAmount: number; comment: string }[]>([])
   const [activeCurse, setActiveCurse] = useState<Card | null>(null)
   const [curseTimestamp, setCurseTimestamp] = useState<number | null>(null)
+  const [failedBackgroundImages, setFailedBackgroundImages] = useState<Set<number>>(new Set())
   const [gameStartTime, setGameStartTime] = useState<number | null>(null)
   const [lastCurseTime, setLastCurseTime] = useState<number | null>(null)
   const [coins, setCoins] = useState(0)
@@ -48,6 +55,10 @@ export default function ChallengeSelector() {
 
     return () => clearInterval(interval)
   }, [drawnCards, activeCurse])
+
+  useEffect(() => {
+    discardExpiredCards()
+  }, [tickCount])
 
   const loadFromStorage = (): boolean => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -112,7 +123,7 @@ export default function ChallengeSelector() {
     saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0)
   }
 
-  const drawReplacementCard = (cards: Card[], timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], coinsValue: number = coins): void => {
+  const drawReplacementCard = (cards: Card[], timestamps: Record<number, number>, hist: HistoryCard[], coinsValue: number = coins): void => {
     const drawn = getRandomCards(CHALLENGES)
     const now = Date.now()
     const newCards = [...cards, drawn[0]]
@@ -135,7 +146,7 @@ export default function ChallengeSelector() {
     saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse, coinsValue)
   }
 
-  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: (Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean })[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
+  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: HistoryCard[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       drawnCards: cards,
       cardTimestamps: timestamps,
@@ -171,7 +182,7 @@ export default function ChallengeSelector() {
     const completedCurse = activeCurse
     const timeLeftWhenCompleted = getTimeRemainingForCurse()
     const newHistory = [
-      { ...completedCurse, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: true } as Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean },
+      { ...completedCurse, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: true, status: 'completed' } as HistoryCard,
       ...history,
     ]
 
@@ -188,8 +199,13 @@ export default function ChallengeSelector() {
     if (!completedCard) return
 
     const timeLeftWhenCompleted = getTimeRemaining(cardId)
+    if (timeLeftWhenCompleted === 0) {
+      discardExpiredCards([cardId])
+      return
+    }
+
     const newHistory = [
-      { ...completedCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: false } as Card & { completedAt: string; timeLeftWhenCompleted: number; isCurse: boolean },
+      { ...completedCard, completedAt: new Date().toLocaleString(), timeLeftWhenCompleted, isCurse: false, status: 'completed' } as HistoryCard,
       ...history,
     ]
 
@@ -205,6 +221,44 @@ export default function ChallengeSelector() {
     drawReplacementCard(remaining, newTimestamps, newHistory, newCoins)
   }
 
+  const discardExpiredCards = (cardIds?: number[]): void => {
+    if (!drawnCards?.length) return
+
+    const expiredCards = drawnCards.filter((card) => {
+      const isSelected = !cardIds || cardIds.includes(card.id)
+      return isSelected && getTimeRemaining(card.id) === 0
+    })
+    if (expiredCards.length === 0) return
+
+    const expiredIds = new Set(expiredCards.map((card) => card.id))
+    const now = Date.now()
+    const newHistory: HistoryCard[] = [
+      ...expiredCards.map((card) => ({
+        ...card,
+        points: 0,
+        completedAt: new Date().toLocaleString(),
+        timeLeftWhenCompleted: 0,
+        isCurse: false,
+        status: 'expired' as const,
+      })),
+      ...history,
+    ]
+    const newTimestamps = { ...cardTimestamps }
+    expiredIds.forEach((id) => delete newTimestamps[id])
+
+    const newCards = drawnCards.filter((card) => !expiredIds.has(card.id))
+    expiredCards.forEach(() => {
+      const replacement = getRandomCards(CHALLENGES)[0]
+      newCards.push(replacement)
+      newTimestamps[replacement.id] = now
+    })
+
+    setDrawnCards(newCards)
+    setCardTimestamps(newTimestamps)
+    setHistory(newHistory)
+    saveToStorage(newCards, newTimestamps, newHistory, activeCurse, curseTimestamp, gameStartTime, lastCurseTime, coins)
+  }
+
   const getCategoryColor = (card: Card): string => {
     if (card.id >= 1 && card.id <= 4) return 'from-purple-500 to-pink-500'
     if (card.id >= 90 && card.id <= 99) return 'from-red-500 to-orange-500'
@@ -215,6 +269,12 @@ export default function ChallengeSelector() {
     if (card.id >= 1 && card.id <= 4) return 'SPECIAL CARD'
     if (card.id >= 90 && card.id <= 99) return 'CURSE'
     return 'CHALLENGE'
+  }
+
+  const getBackgroundImage = (card: Card): string | undefined => {
+    if (card.backgroundImage) return card.backgroundImage
+    if (card.id >= 5 && card.id <= 89) return `/challenges/${card.id}.jpg`
+    return undefined
   }
 
   const formatTime = (seconds: number): string => {
@@ -343,12 +403,26 @@ export default function ChallengeSelector() {
         <div className={`grid gap-6 ${drawnCards.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
           {drawnCards.map((card) => {
             const timeRemaining = getTimeRemaining(card.id)
+            const backgroundImage = getBackgroundImage(card)
+            const imageFailed = failedBackgroundImages.has(card.id)
             return (
               <div
                 key={card.id}
-                className={`bg-gradient-to-r ${getCategoryColor(card)} rounded-xl p-8 text-white shadow-2xl flex flex-col`}
+                className={`${imageFailed ? 'bg-slate-800' : `bg-gradient-to-r ${getCategoryColor(card)}`} relative overflow-hidden rounded-xl p-8 text-white shadow-2xl flex flex-col`}
               >
-                <div className="space-y-4 flex-1">
+                {backgroundImage && !imageFailed && (
+                  <>
+                    <img
+                      src={backgroundImage}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={() => setFailedBackgroundImages((failed) => new Set(failed).add(card.id))}
+                    />
+                    <div className="absolute inset-0 bg-slate-950/70" aria-hidden="true" />
+                  </>
+                )}
+                <div className="relative z-10 space-y-4 flex-1">
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="text-sm font-bold opacity-90">{getCategoryLabel(card)} #{card.id}</div>
@@ -367,14 +441,14 @@ export default function ChallengeSelector() {
                 </div>
                 <button
                   onClick={() => handleCompleteCard(card.id)}
-                  disabled={activeCurse && activeCurse.isBlocking}
-                  className={`mt-6 w-full font-bold py-3 px-4 rounded-lg transition border ${
-                    activeCurse && activeCurse.isBlocking
+                  disabled={(activeCurse && activeCurse.isBlocking) || timeRemaining === 0}
+                  className={`relative z-10 mt-6 w-full font-bold py-3 px-4 rounded-lg transition border ${
+                    (activeCurse && activeCurse.isBlocking) || timeRemaining === 0
                       ? 'bg-white bg-opacity-10 text-white text-opacity-50 border-white border-opacity-10 cursor-not-allowed'
                       : 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white border border-white border-opacity-30'
                   }`}
                 >
-                  {activeCurse && activeCurse.isBlocking ? '🔒 Blocked by curse' : '✓ Complete'}
+                  {timeRemaining === 0 ? 'Expired' : activeCurse && activeCurse.isBlocking ? '🔒 Blocked by curse' : '✓ Complete'}
                 </button>
               </div>
             )
@@ -418,7 +492,7 @@ export default function ChallengeSelector() {
 
       {history.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-gray-800">Completed Challenges</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Challenge History</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {history.map((card, idx) => (
               <div
@@ -426,10 +500,12 @@ export default function ChallengeSelector() {
                 className={`p-3 rounded-lg text-sm border-l-4 ${
                   card.isCurse
                     ? 'bg-red-50 text-gray-700 border-red-500'
+                    : card.status === 'expired'
+                      ? 'bg-gray-100 text-gray-700 border-gray-500'
                     : 'bg-gray-100 text-gray-700 border-green-500'
                 }`}
               >
-                <div className="font-semibold">{card.isCurse ? '⚠ ' : ''}#{card.id} - {card.title}</div>
+                <div className="font-semibold">{card.isCurse ? '⚠ ' : card.status === 'expired' ? 'Expired ' : ''}#{card.id} - {card.title}</div>
                 <div className="text-xs text-gray-600 mt-1">
                   {card.completedAt} · {card.points !== null ? `+${card.points} pts` : 'Variable points'} · {formatTime(card.timeLeftWhenCompleted)} remaining
                 </div>
