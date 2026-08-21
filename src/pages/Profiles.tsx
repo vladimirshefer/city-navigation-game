@@ -40,7 +40,9 @@ export default function Profiles() {
                   <div className="mt-1 text-sm text-gray-600">💰 {profile.state.coins} coins · {profile.state.history.length} history entries</div>
                 </div>
                 <button
-                  onClick={() => handleSelect(profile.id)}
+                  onClick={() => {
+                    if (window.confirm(`Switch to ${profile.id}?`)) handleSelect(profile.id)
+                  }}
                   disabled={isActive}
                   className={`rounded-lg px-4 py-2 font-bold transition ${isActive ? 'cursor-default bg-gray-200 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                 >

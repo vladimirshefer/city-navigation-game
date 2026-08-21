@@ -350,6 +350,8 @@ export default function ChallengeSelector() {
       return
     }
 
+    if (!window.confirm(`Change coins from ${coins} to ${newAmount}?`)) return
+
     const newEdit = {
       timestamp: new Date().toLocaleString(),
       previousAmount: coins,
@@ -455,7 +457,11 @@ export default function ChallengeSelector() {
                 return (
                   <button
                     key={option.cost}
-                    onClick={() => handleBuyFahrkarte(option)}
+                    onClick={() => {
+                      if (window.confirm(`Spend ${option.cost} coins for ${option.stops} stops and ${Math.round(option.durationSeconds / 60)} minutes?`)) {
+                        handleBuyFahrkarte(option)
+                      }
+                    }}
                     disabled={cannotAfford}
                     className={`rounded-lg border-2 px-4 py-3 text-left transition ${cannotAfford ? 'cursor-not-allowed border-white border-opacity-20 bg-white bg-opacity-10 text-white text-opacity-50' : 'border-white border-opacity-40 bg-white bg-opacity-15 hover:bg-opacity-25'}`}
                   >
@@ -502,7 +508,9 @@ export default function ChallengeSelector() {
             <p className="text-lg leading-relaxed opacity-95">{activeCurse.description}</p>
           </div>
           <button
-            onClick={handleCompleteCurse}
+            onClick={() => {
+              if (window.confirm(`Mark “${activeCurse.title}” as completed?`)) handleCompleteCurse()
+            }}
             className="mt-6 w-full bg-red-700 hover:bg-red-800 text-white font-bold py-3 px-4 rounded-lg transition border-2 border-red-400"
           >
             ✓ Complete Curse
@@ -551,7 +559,9 @@ export default function ChallengeSelector() {
                   )}
                 </div>
                 <button
-                  onClick={() => handleCompleteCard(card.id)}
+                  onClick={() => {
+                    if (window.confirm(`Mark “${card.title}” as completed?`)) handleCompleteCard(card.id)
+                  }}
                   disabled={(activeCurse && activeCurse.isBlocking) || timeRemaining === 0}
                   className={`relative z-10 mt-6 w-full font-bold py-3 px-4 rounded-lg transition border ${
                     (activeCurse && activeCurse.isBlocking) || timeRemaining === 0
@@ -570,6 +580,8 @@ export default function ChallengeSelector() {
       {drawnCards && (
         <button
           onClick={() => {
+            if (!window.confirm('This will create a new profile. Your current profile will be saved and can be selected later.')) return
+
             const drawn = getRandomCards(CHALLENGES)
             const now = Date.now()
             const newTimestamps: Record<number, number> = {}
