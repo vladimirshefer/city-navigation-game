@@ -9,7 +9,7 @@ export default function Layout() {
             David
           </Link>
           <Link to="/about" className="text-gray-600 hover:text-gray-900">
-            About
+            Map
           </Link>
         </div>
       </nav>
