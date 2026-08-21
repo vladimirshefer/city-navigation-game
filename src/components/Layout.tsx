@@ -1,4 +1,4 @@
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link } from 'react-router-dom';
 
 export default function Layout() {
   return (
@@ -20,5 +20,5 @@ export default function Layout() {
         <Outlet />
       </main>
     </div>
-  )
+  );
 }
