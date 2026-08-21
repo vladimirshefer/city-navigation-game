@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
 import { CHALLENGES, CURSES, Card } from '../data/challenges'
 import { createGameProfile, getActiveProfile, saveActiveGameState } from '../data/profiles'
-import type { GameState, HistoryCard } from '../data/profiles'
+import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles'
 
 const TIMER_DURATION = 3600
+const FAHRKARTE_OPTIONS = [
+  { cost: 10, stops: 5, durationSeconds: 20 * 60 },
+  { cost: 30, stops: 20, durationSeconds: 60 * 60 },
+] as const
 
 export default function ChallengeSelector() {
   const [drawnCards, setDrawnCards] = useState<Card[] | null>(null)
@@ -17,6 +21,8 @@ export default function ChallengeSelector() {
   const [gameStartTime, setGameStartTime] = useState<number | null>(null)
   const [lastCurseTime, setLastCurseTime] = useState<number | null>(null)
   const [coins, setCoins] = useState(0)
+  const [activeFahrkarte, setActiveFahrkarte] = useState<Fahrkarte | null>(null)
+  const [fahrkartenHistory, setFahrkartenHistory] = useState<Fahrkarte[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editAmount, setEditAmount] = useState('')
@@ -30,17 +36,18 @@ export default function ChallengeSelector() {
   }, [])
 
   useEffect(() => {
-    if ((!drawnCards || drawnCards.length === 0) && !activeCurse) return
+    if ((!drawnCards || drawnCards.length === 0) && !activeCurse && !activeFahrkarte) return
 
     const interval = setInterval(() => {
       setTickCount((prev) => prev + 1)
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [drawnCards, activeCurse])
+  }, [drawnCards, activeCurse, activeFahrkarte])
 
   useEffect(() => {
     discardExpiredCards()
+    expireFahrkarte()
   }, [tickCount])
 
   const loadFromStorage = (): boolean => {
@@ -58,6 +65,15 @@ export default function ChallengeSelector() {
     setGameStartTime(state.gameStartTime ?? null)
     setLastCurseTime(state.lastCurseTime ?? null)
     setCoins(state.coins ?? 0)
+    setFahrkartenHistory(state.fahrkartenHistory || [])
+
+    const savedFahrkarte = state.activeFahrkarte || null
+    if (savedFahrkarte && savedFahrkarte.expiresAt <= Date.now()) {
+      setActiveFahrkarte(null)
+      saveActiveGameState({ ...state, activeFahrkarte: null, fahrkartenHistory: state.fahrkartenHistory || [] })
+    } else {
+      setActiveFahrkarte(savedFahrkarte)
+    }
     return true
   }
 
@@ -144,7 +160,7 @@ export default function ChallengeSelector() {
     saveToStorage(newCards, newTimestamps, hist, curse, curseTs, gameStartTime, lastCurse, coinsValue)
   }
 
-  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: HistoryCard[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits): void => {
+  const saveToStorage = (cards: Card[] | null, timestamps: Record<number, number>, hist: HistoryCard[], curse: Card | null = null, curseTs: number | null = null, startTime: number | null = null, lastCurseTs: number | null = null, coinsValue: number = coins, edits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[] = coinEdits, fahrkarte: Fahrkarte | null = activeFahrkarte, fahrkartenHist: Fahrkarte[] = fahrkartenHistory): void => {
     const state: GameState = {
       drawnCards: cards,
       cardTimestamps: timestamps,
@@ -155,6 +171,8 @@ export default function ChallengeSelector() {
       gameStartTime: startTime,
       lastCurseTime: lastCurseTs,
       coins: coinsValue,
+      activeFahrkarte: fahrkarte,
+      fahrkartenHistory: fahrkartenHist,
     }
     saveActiveGameState(state)
   }
@@ -287,6 +305,39 @@ export default function ChallengeSelector() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  const getFahrkarteTimeRemaining = (): number => {
+    if (!activeFahrkarte) return 0
+    return Math.max(0, Math.ceil((activeFahrkarte.expiresAt - Date.now()) / 1000))
+  }
+
+  const expireFahrkarte = (): void => {
+    if (!activeFahrkarte || getFahrkarteTimeRemaining() > 0) return
+
+    setActiveFahrkarte(null)
+    saveToStorage(drawnCards, cardTimestamps, history, activeCurse, curseTimestamp, gameStartTime, lastCurseTime, coins, coinEdits, null, fahrkartenHistory)
+  }
+
+  const handleBuyFahrkarte = (option: typeof FAHRKARTE_OPTIONS[number]): void => {
+    if (activeFahrkarte || coins < option.cost) return
+
+    const now = Date.now()
+    const newFahrkarte: Fahrkarte = {
+      id: `fahrkarte-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      cost: option.cost,
+      stops: option.stops,
+      durationSeconds: option.durationSeconds,
+      purchasedAt: new Date(now).toISOString(),
+      expiresAt: now + option.durationSeconds * 1000,
+    }
+    const newCoins = coins - option.cost
+    const newHistory = [newFahrkarte, ...fahrkartenHistory]
+
+    setCoins(newCoins)
+    setActiveFahrkarte(newFahrkarte)
+    setFahrkartenHistory(newHistory)
+    saveToStorage(drawnCards, cardTimestamps, history, activeCurse, curseTimestamp, gameStartTime, lastCurseTime, newCoins, coinEdits, newFahrkarte, newHistory)
+  }
+
   const handleSaveCoinEdit = (): void => {
     if (!editAmount || !editComment.trim()) {
       alert('Please enter both an amount and a comment')
@@ -380,6 +431,61 @@ export default function ChallengeSelector() {
           </div>
         </div>
       )}
+
+      <div className="space-y-3">
+        {activeFahrkarte ? (
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl p-8 text-white shadow-2xl flex flex-col">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-sm font-bold opacity-90 uppercase">🚇 FAHRKARTE</div>
+                <h2 className="text-3xl font-bold mt-2">Public transport access</h2>
+              </div>
+              <div className={`text-right text-2xl font-bold ${getFahrkarteTimeRemaining() < 300 ? 'animate-pulse' : ''}`}>
+                {formatTime(getFahrkarteTimeRemaining())}
+              </div>
+            </div>
+            <p className="text-lg leading-relaxed mt-4">{activeFahrkarte.stops} stops · valid for {Math.round(activeFahrkarte.durationSeconds / 60)} minutes</p>
+            <p className="text-sm opacity-90 mt-2">Stop usage is self-managed.</p>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl p-3 text-white shadow-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {FAHRKARTE_OPTIONS.map((option) => {
+                const cannotAfford = coins < option.cost
+                return (
+                  <button
+                    key={option.cost}
+                    onClick={() => handleBuyFahrkarte(option)}
+                    disabled={cannotAfford}
+                    className={`rounded-lg border-2 px-4 py-3 text-left transition ${cannotAfford ? 'cursor-not-allowed border-white border-opacity-20 bg-white bg-opacity-10 text-white text-opacity-50' : 'border-white border-opacity-40 bg-white bg-opacity-15 hover:bg-opacity-25'}`}
+                  >
+                    <div className="font-bold">🚇 FAHRKARTE</div>
+                    <div className="font-bold">{option.stops} stops · {Math.round(option.durationSeconds / 60)} minutes</div>
+                    <div className="text-sm mt-1">💰 {option.cost} coins{cannotAfford ? ' · Not enough coins' : ''}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {fahrkartenHistory.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold text-gray-800">Fahrkarten History</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {fahrkartenHistory.map((fahrkarte) => {
+                const expired = fahrkarte.expiresAt <= Date.now()
+                return (
+                  <div key={fahrkarte.id} className={`p-3 rounded-lg text-sm border-l-4 ${expired ? 'bg-gray-100 border-gray-500' : 'bg-emerald-50 border-emerald-500'}`}>
+                    <div className="font-semibold">{fahrkarte.stops} stops · {Math.round(fahrkarte.durationSeconds / 60)} minutes · {expired ? 'Expired' : 'Active'}</div>
+                    <div className="text-xs text-gray-600 mt-1">{new Date(fahrkarte.purchasedAt).toLocaleString()} · 💰 {fahrkarte.cost} coins</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {activeCurse && (
         <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-red-700">
@@ -487,6 +593,8 @@ export default function ChallengeSelector() {
             setGameStartTime(now)
             setLastCurseTime(now)
             setCoins(0)
+            setActiveFahrkarte(null)
+            setFahrkartenHistory([])
             setFailedBackgroundImages(new Set())
             const newProfile = createGameProfile({
               drawnCards: drawn,
@@ -498,6 +606,8 @@ export default function ChallengeSelector() {
               gameStartTime: now,
               lastCurseTime: now,
               coins: 0,
+              activeFahrkarte: null,
+              fahrkartenHistory: [],
             })
             setActiveProfileId(newProfile.id)
           }}

@@ -11,6 +11,15 @@ export type HistoryCard = Card & {
   status?: 'completed' | 'expired'
 }
 
+export interface Fahrkarte {
+  id: string
+  cost: number
+  stops: number
+  durationSeconds: number
+  purchasedAt: string
+  expiresAt: number
+}
+
 export interface GameState {
   drawnCards: Card[] | null
   cardTimestamps: Record<number, number>
@@ -21,6 +30,8 @@ export interface GameState {
   gameStartTime: number | null
   lastCurseTime: number | null
   coins: number
+  activeFahrkarte: Fahrkarte | null
+  fahrkartenHistory: Fahrkarte[]
 }
 
 export interface GameProfile {
