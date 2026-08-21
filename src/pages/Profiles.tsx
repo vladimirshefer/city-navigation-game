@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GameProfile, getActiveProfile, getProfiles, setActiveProfile } from '../data/profiles';
+import {
+  createEmptyGameState,
+  createGameProfile,
+  GameProfile,
+  getActiveProfile,
+  getProfiles,
+  setActiveProfile,
+} from '../data/profiles';
 
 const formatDate = (value: string): string => new Date(value).toLocaleString();
 
@@ -21,10 +28,24 @@ export default function Profiles() {
     navigate('/');
   };
 
+  const handleCreate = (): void => {
+    if (!window.confirm('Create a new game profile? Your current profile will be saved.')) return;
+    createGameProfile(createEmptyGameState());
+    navigate('/');
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-4xl font-bold text-gray-900">Profiles</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-4xl font-bold text-gray-900">Profiles</h1>
+          <button
+            onClick={handleCreate}
+            className="rounded-lg bg-orange-600 px-4 py-2 font-bold text-white transition hover:bg-orange-700"
+          >
+            New Game
+          </button>
+        </div>
         <p className="mt-2 text-gray-600">
           Every profile keeps its own cards, curses, coins, and history.
         </p>

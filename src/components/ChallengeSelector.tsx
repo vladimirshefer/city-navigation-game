@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CHALLENGES, CURSES, Card } from '../data/challenges';
-import { createGameProfile, getActiveProfile, saveActiveGameState } from '../data/profiles';
+import { getActiveProfile, saveActiveGameState } from '../data/profiles';
 import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles';
 
 const TIMER_DURATION = 3600;
@@ -25,7 +25,6 @@ export default function ChallengeSelector() {
   const [coins, setCoins] = useState(0);
   const [activeFahrkarte, setActiveFahrkarte] = useState<Fahrkarte | null>(null);
   const [fahrkartenHistory, setFahrkartenHistory] = useState<Fahrkarte[]>([]);
-  const [, setActiveProfileId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editAmount, setEditAmount] = useState('');
   const [editComment, setEditComment] = useState('');
@@ -57,7 +56,6 @@ export default function ChallengeSelector() {
     if (!activeProfile) return false;
 
     const state = activeProfile.state;
-    setActiveProfileId(activeProfile.id);
     setDrawnCards(state.drawnCards);
     setCardTimestamps(state.cardTimestamps || {});
     setHistory(state.history || []);
@@ -80,7 +78,7 @@ export default function ChallengeSelector() {
     } else {
       setActiveFahrkarte(savedFahrkarte);
     }
-    return true;
+    return state.drawnCards !== null;
   };
 
   const getCurseProbability = (referenceTime: number): number => {
@@ -135,7 +133,6 @@ export default function ChallengeSelector() {
     setActiveCurse(curse);
     setCurseTimestamp(curseTs);
     saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, lastCurseTime || now, 0);
-    setActiveProfileId(getActiveProfile()?.id || null);
   };
 
   const drawReplacementCard = (
@@ -679,63 +676,6 @@ export default function ChallengeSelector() {
             );
           })}
         </div>
-      )}
-
-      {drawnCards && (
-        <button
-          onClick={() => {
-            if (
-              !window.confirm(
-                'This will create a new profile. Your current profile will be saved and can be selected later.',
-              )
-            )
-              return;
-
-            const drawn = getRandomCards(CHALLENGES);
-            const now = Date.now();
-            const newTimestamps: Record<number, number> = {};
-            drawn.forEach((card) => {
-              newTimestamps[card.id] = now;
-            });
-
-            let curse: Card | null = null;
-            let curseTs: number | null = null;
-            if (shouldDrawCurse(now)) {
-              curse = drawCurseCard(getUsedCardIds(drawn, [], null));
-              if (curse) curseTs = now;
-            }
-
-            setDrawnCards(drawn);
-            setCardTimestamps(newTimestamps);
-            setHistory([]);
-            setCoinEdits([]);
-            setActiveCurse(curse);
-            setCurseTimestamp(curseTs);
-            setGameStartTime(now);
-            setLastCurseTime(now);
-            setCoins(0);
-            setActiveFahrkarte(null);
-            setFahrkartenHistory([]);
-            setFailedBackgroundImages(new Set());
-            const newProfile = createGameProfile({
-              drawnCards: drawn,
-              cardTimestamps: newTimestamps,
-              history: [],
-              coinEdits: [],
-              activeCurse: curse,
-              curseTimestamp: curseTs,
-              gameStartTime: now,
-              lastCurseTime: now,
-              coins: 0,
-              activeFahrkarte: null,
-              fahrkartenHistory: [],
-            });
-            setActiveProfileId(newProfile.id);
-          }}
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg transition"
-        >
-          New Game (New Profile)
-        </button>
       )}
 
       {history.length > 0 && (

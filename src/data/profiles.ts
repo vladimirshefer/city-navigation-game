@@ -41,6 +41,20 @@ export interface GameProfile {
   state: GameState;
 }
 
+export const createEmptyGameState = (): GameState => ({
+  drawnCards: null,
+  cardTimestamps: {},
+  history: [],
+  coinEdits: [],
+  activeCurse: null,
+  curseTimestamp: null,
+  gameStartTime: null,
+  lastCurseTime: null,
+  coins: 0,
+  activeFahrkarte: null,
+  fahrkartenHistory: [],
+});
+
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -102,11 +116,12 @@ export const getActiveProfile = (): GameProfile | null => {
   if (profiles.length === 0) return null;
 
   const activeId = localStorage.getItem(ACTIVE_PROFILE_STORAGE_KEY);
-  const activeProfile = profiles.find((profile) => profile.id === activeId) || profiles[0];
-  if (activeProfile.id !== activeId) {
-    localStorage.setItem(ACTIVE_PROFILE_STORAGE_KEY, activeProfile.id);
+  if (activeId) {
+    return profiles.find((profile) => profile.id === activeId) || null;
   }
 
+  const activeProfile = profiles[0];
+  localStorage.setItem(ACTIVE_PROFILE_STORAGE_KEY, activeProfile.id);
   return activeProfile;
 };
 
@@ -122,7 +137,7 @@ export const saveActiveGameState = (state: GameState): void => {
       updatedAt: now,
       state,
     };
-    writeProfiles([profile]);
+    writeProfiles([...profiles, profile]);
     localStorage.setItem(ACTIVE_PROFILE_STORAGE_KEY, profile.id);
     return;
   }
