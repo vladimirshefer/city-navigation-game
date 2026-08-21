@@ -77,9 +77,18 @@ export default function ChallengeSelector() {
     return Math.random() < probability
   }
 
-  const drawCurseCard = (): Card => {
-    const randomCurse = CURSES[Math.floor(Math.random() * CURSES.length)]
-    return randomCurse
+  const getUsedCardIds = (cards: Card[] | null, hist: HistoryCard[], curse: Card | null): Set<number> => {
+    return new Set([
+      ...(cards || []),
+      ...hist,
+      ...(curse ? [curse] : []),
+    ].map((card) => card.id))
+  }
+
+  const drawCurseCard = (usedCardIds: Set<number>): Card | null => {
+    const availableCurses = CURSES.filter((curse) => !usedCardIds.has(curse.id))
+    if (availableCurses.length === 0) return null
+    return availableCurses[Math.floor(Math.random() * availableCurses.length)]
   }
 
   const drawInitialCards = (): void => {
@@ -93,8 +102,8 @@ export default function ChallengeSelector() {
     let curse: Card | null = null
     let curseTs: number | null = null
     if (shouldDrawCurse(now)) {
-      curse = drawCurseCard()
-      curseTs = now
+      curse = drawCurseCard(getUsedCardIds(drawn, [], null))
+      if (curse) curseTs = now
     }
 
     setGameStartTime(now)
@@ -108,19 +117,24 @@ export default function ChallengeSelector() {
   }
 
   const drawReplacementCard = (cards: Card[], timestamps: Record<number, number>, hist: HistoryCard[], coinsValue: number = coins): void => {
-    const drawn = getRandomCards(CHALLENGES)
+    const replacement = getRandomCards(CHALLENGES, getUsedCardIds(cards, hist, activeCurse))[0]
     const now = Date.now()
-    const newCards = [...cards, drawn[0]]
-    const newTimestamps = { ...timestamps, [drawn[0].id]: now }
+    const newCards = replacement ? [...cards, replacement] : cards
+    const newTimestamps = { ...timestamps }
+    if (replacement) {
+      newTimestamps[replacement.id] = now
+    }
 
     let curse: Card | null = activeCurse
     let curseTs: number | null = curseTimestamp
     let lastCurse: number | null = lastCurseTime
 
     if (!activeCurse && shouldDrawCurse(lastCurseTime || gameStartTime || now)) {
-      curse = drawCurseCard()
-      curseTs = now
-      lastCurse = lastCurseTime
+      curse = drawCurseCard(getUsedCardIds(newCards, hist, null))
+      if (curse) {
+        curseTs = now
+        lastCurse = lastCurseTime
+      }
     }
 
     setDrawnCards(newCards)
@@ -145,9 +159,10 @@ export default function ChallengeSelector() {
     saveActiveGameState(state)
   }
 
-  const getRandomCards = (cards: Card[]): Card[] => {
-    const shuffled = [...cards].sort(() => Math.random() - 0.5)
-    return [shuffled[0], shuffled[1]]
+  const getRandomCards = (cards: Card[], usedCardIds: Set<number> = new Set()): Card[] => {
+    const availableCards = cards.filter((card) => !usedCardIds.has(card.id))
+    const shuffled = [...availableCards].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, 2)
   }
 
   const getTimeRemaining = (cardId: number): number => {
@@ -232,10 +247,14 @@ export default function ChallengeSelector() {
     expiredIds.forEach((id) => delete newTimestamps[id])
 
     const newCards = drawnCards.filter((card) => !expiredIds.has(card.id))
+    const usedCardIds = getUsedCardIds(newCards, newHistory, activeCurse)
     expiredCards.forEach(() => {
-      const replacement = getRandomCards(CHALLENGES)[0]
+      const replacement = getRandomCards(CHALLENGES, usedCardIds)[0]
+      if (!replacement) return
+
       newCards.push(replacement)
       newTimestamps[replacement.id] = now
+      usedCardIds.add(replacement.id)
     })
 
     setDrawnCards(newCards)
@@ -455,8 +474,8 @@ export default function ChallengeSelector() {
             let curse: Card | null = null
             let curseTs: number | null = null
             if (shouldDrawCurse(now)) {
-              curse = drawCurseCard()
-              curseTs = now
+              curse = drawCurseCard(getUsedCardIds(drawn, [], null))
+              if (curse) curseTs = now
             }
 
             setDrawnCards(drawn)
