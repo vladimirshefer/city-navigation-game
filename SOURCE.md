@@ -11,7 +11,7 @@
 | :---- | :---- |
 | Friedrichshain-Kreuzberg | Old [Anhalter Bahnhof](https://maps.app.goo.gl/XpRDr8sp23W23Pzp7) (the old wall of the now destroyed station above ground) |
 | Neukölln | [Modellboothafen Britzer Garten](https://maps.app.goo.gl/NWLJUthNrkw1WPNL8) (get 10 extra coins if the photo contains a model boat) |
-| Tempelhof-Schöneberg | [IKEA Schöneberg](https://maps.app.goo.gl/GdimwaYUKxU3tDnF9) (get 10 extra points if you’re inside the main building) |
+| Tempelhof-Schöneberg | [IKEA](https://maps.app.goo.gl/GdimwaYUKxU3tDnF9) (get 10 extra points if you’re inside) |
 | Charlottenburg-Wilmersdorf | [Plant tunnel in the Lietzenseepark](https://maps.app.goo.gl/Kv8TpLCrejQFFnLR8) (any path where plants grow above it) |
 | Steglitz-Zehlendorf | [Kreisel](https://maps.app.goo.gl/L16JjvUSPkQ9qyp9A) (get 10 extra points if you’re less than 30m away from the building) |
 | Spandau | Gate of the [Bezirkszentralbibliothek Spandau](https://maps.app.goo.gl/8WjpDPstdFRixQxC8) |
@@ -19,8 +19,9 @@
 | Pankow | [Birkenhain im Mauerpark](https://maps.app.goo.gl/YHuR97b4vXveDqux6) (birches must be visible) |
 | Lichtenberg | Any entry to the [Tierpark Berlin](https://maps.app.goo.gl/xhaQ1dn31LteVRz4A) |
 | Marzahn-Hellersdorf | Cable car (get 10 extra points if a gondola is clearly visible, not just the ropes; note that entering the [Gardens of the World](https://maps.app.goo.gl/QNDFp1xaGjejzQFt9) is NOT necessary to see the cable car\!) |
-| Treptop-Köpenick | Any statue or fountain inside [Treptower Park](https://maps.app.goo.gl/c944qgbtvYcwAdFz5) |
+| Treptow-Köpenick | Any statue or fountain inside [Treptower Park](https://maps.app.goo.gl/c944qgbtvYcwAdFz5) |
 
+Note: Bonus points are only available for the first capture of a team, not second visits.
 
 # **Cards:**
 
@@ -37,7 +38,7 @@ Recommendation: Set a timer on your phone every time you start a new challenge. 
 | 1 | Steal 10 coins from another team. (Note: Ask them if they have at least 10\. If not, you only get what they have.) | 10 |
 | 2 | Steal 20 coins from another team. (Note: Ask them if they have at least 20\. If not, you only get what they have.) | 20 |
 | 3 | Steal 30 coins from another team. (Note: Ask them if they have at least 30\. If not, you only get what they have.) | 30 |
-| 4 | Travel the next 15 min for free (set a countdown upon reading this card). | 0 |
+| 4 | Get a free (or extended) Fahrkarte of 5 stops / 20 minutes. | 0 |
 
 ## **Challenges:**
 
@@ -69,7 +70,7 @@ Recommendation: Set a timer on your phone every time you start a new challenge. 
 | 29 | Find three parked electric scooters and/or bicycles in one spot. | 5 |
 | 30 | Find a street named after a famous artist, scientist, or writer. | 5 |
 | 31 | Wave at a boat and get a wave back. | 10 |
-| 32 | Locate a station map and point to where you currently are. | 5 |
+| 32 | Locate a stations map of Berlin and point to where you currently are. | 5 |
 | 33 | Find a playground and swing on a swing for at least one minute. | 10 |
 | 34 | Write a touristy Berlin postcard with a nice message about the city (it may be posted later). | 10 |
 | 35 | When entering the next train, tram or bus, say out loud “Fahrkarten bitte”. | 10 |
@@ -130,9 +131,9 @@ Recommendation: Set a timer on your phone every time you start a new challenge. 
 
 ## **Curses:**
 
-Note: Walking is always allowed. Every curse means that you must leave your current mode of transportation; however, you may resume with the next transport option if your curse doesn’t forbid it. Curses MUST be cleared before conquering new districts or fulfilling other challenges\! The countdown of your current challenges does not get paused by curses\!
+Note: Walking is always allowed. Every curse means that you must leave your current mode of transportation; however, you may resume with the next transport option if your curse doesn’t forbid it. Curses MUST be cleared before fulfilling other challenges (unless you don’t have enough coins to solve a curse) or conquering new districts\! The countdown of your current challenges does not get paused by curses\!
 
-| 90 | TRAIN ROULETTE: Leave your current mode of transportation now\! Go to the next U-Bahn or S-Bahn station or bus stop and take the very next train or bus. You’re only permitted to leave once you have (while aboard): 1\. seen a (different) bus; and 2\. seen a person wearing a hat/cap. Any transport during this curse is for free (you’re losing only time but no coins); if your line ends before the curse ends, proceed using the next train of the same line in the other direction.  | 0 |
+| 90 | TRAIN ROULETTE: Leave your current mode of transportation now\! Go to the next U-Bahn or S-Bahn station or bus stop and take the very next train or bus. You’re only permitted to leave once you have (while aboard): 1\. seen a (different) bus; and 2\. seen a person wearing a hat/cap. Any transport during this curse is for free (you’re losing only time but no coins); if your line ends before the curse ends, proceed using the next mode of transportation from there.  | 0 |
 | :---- | :---- | :---- |
 | 91 | SLOW DOWN: Leave your current mode of transportation now\!For the next 20 minutes, you may only use buses and trams.  | 0 |
 | 92 | HURRY UP: Leave your current mode of transportation now\!For the next 20 minutes, you may only use S- and U-Bahn. | 0 |

@@ -198,7 +198,7 @@ const CHALLENGE_CARDS: Card[] = [
   {
     id: 32,
     title: 'Station map',
-    description: 'Locate a station map and point to where you currently are.',
+    description: 'Locate a stations map of Berlin and point to where you currently are.',
     points: 5,
   },
   {
@@ -413,7 +413,7 @@ const CHALLENGE_CARDS: Card[] = [
     id: 66,
     title: 'Pedestrian count',
     description:
-      'Find a pedestrian traffic light. At its next green phase, if at least 10 people cross, you win.',
+      'Find a pedestrian traffic light. Decide on the starting time of your challenge. If at the next green phase there are at least 10 people crossing, you win.',
     points: 8,
   },
   {
@@ -557,7 +557,7 @@ export const CURSES: Card[] = [
     id: 90,
     title: 'Train Roulette',
     description:
-      'Leave your current mode of transport. Go to the next U-Bahn or S-Bahn station or bus stop and take the very next train or bus. You may leave only after seeing a different bus and a person wearing a hat or cap while aboard. Transport during this curse is free. If your line ends first, take the next train of the same line in the other direction.',
+      'Leave your current mode of transport. Go to the next U-Bahn or S-Bahn station or bus stop and take the very next train or bus. You may leave only after seeing a different bus and a person wearing a hat or cap while aboard. Transport during this curse is free. If your line ends first, continue using the next mode of transportation from there.',
     points: 0,
     isBlocking: true,
   },
