@@ -5,6 +5,7 @@ import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles';
 
 const TIMER_DURATION = 3600;
 const BLESSING_TIMER_DURATION = 10 * 60;
+const TIMEOUT_DURATION = 10 * 60;
 const FAHRKARTE_OPTIONS = [
   { cost: 10, stops: 5, durationSeconds: 20 * 60 },
   { cost: 30, stops: 20, durationSeconds: 60 * 60 },
@@ -20,6 +21,7 @@ export default function ChallengeSelector() {
   >([]);
   const [activeCurse, setActiveCurse] = useState<Card | null>(null);
   const [curseTimestamp, setCurseTimestamp] = useState<number | null>(null);
+  const [timeoutTimestamp, setTimeoutTimestamp] = useState<number | null>(null);
   const [activeBlessing, setActiveBlessing] = useState<Card | null>(null);
   const [blessingTimestamp, setBlessingTimestamp] = useState<number | null>(null);
   const [failedBackgroundImages, setFailedBackgroundImages] = useState<Set<number>>(new Set());
@@ -45,6 +47,7 @@ export default function ChallengeSelector() {
       (!drawnCards || drawnCards.length === 0) &&
       !activeCurse &&
       !activeBlessing &&
+      !timeoutTimestamp &&
       !activeFahrkarte &&
       !activeFreeFahrkarte
     )
@@ -55,11 +58,19 @@ export default function ChallengeSelector() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [drawnCards, activeCurse, activeBlessing, activeFahrkarte, activeFreeFahrkarte]);
+  }, [
+    drawnCards,
+    activeCurse,
+    activeBlessing,
+    timeoutTimestamp,
+    activeFahrkarte,
+    activeFreeFahrkarte,
+  ]);
 
   useEffect(() => {
     discardExpiredCards();
     expireFahrkarten();
+    expireTimeout();
   }, [tickCount]);
 
   const loadFromStorage = (): boolean => {
@@ -73,6 +84,12 @@ export default function ChallengeSelector() {
     setCoinEdits(state.coinEdits || []);
     setActiveCurse(state.activeCurse || null);
     setCurseTimestamp(state.curseTimestamp ?? null);
+    const savedTimeoutTimestamp = state.timeoutTimestamp ?? null;
+    setTimeoutTimestamp(
+      savedTimeoutTimestamp && Date.now() - savedTimeoutTimestamp < TIMEOUT_DURATION * 1000
+        ? savedTimeoutTimestamp
+        : null,
+    );
     setActiveBlessing(state.activeBlessing || null);
     setBlessingTimestamp(state.blessingTimestamp ?? null);
     setGameStartTime(state.gameStartTime ?? null);
@@ -223,6 +240,7 @@ export default function ChallengeSelector() {
       blessing,
       blessingTs,
       freeFahrkarte,
+      null,
     );
   };
 
@@ -231,6 +249,7 @@ export default function ChallengeSelector() {
     timestamps: Record<number, number>,
     hist: HistoryCard[],
     coinsValue: number = coins,
+    timeoutTs: number | null = timeoutTimestamp,
   ): void => {
     const replacement = getRandomCards(
       CHALLENGES,
@@ -254,6 +273,7 @@ export default function ChallengeSelector() {
     if (
       !activeCurse &&
       !activeBlessing &&
+      !timeoutTs &&
       !activeFreeFahrkarte &&
       shouldDrawCurse(lastCurseTime || gameStartTime || now)
     ) {
@@ -294,6 +314,7 @@ export default function ChallengeSelector() {
       blessing,
       blessingTs,
       freeFahrkarte,
+      timeoutTs,
     );
   };
 
@@ -317,6 +338,7 @@ export default function ChallengeSelector() {
     blessing: Card | null = activeBlessing,
     blessingTs: number | null = blessingTimestamp,
     freeFahrkarte: Fahrkarte | null = activeFreeFahrkarte,
+    timeoutTs: number | null = timeoutTimestamp,
   ): void => {
     const state: GameState = {
       drawnCards: cards,
@@ -325,6 +347,7 @@ export default function ChallengeSelector() {
       coinEdits: edits,
       activeCurse: curse,
       curseTimestamp: curseTs,
+      timeoutTimestamp: timeoutTs,
       activeBlessing: blessing,
       blessingTimestamp: blessingTs,
       gameStartTime: startTime,
@@ -361,6 +384,12 @@ export default function ChallengeSelector() {
     const blessingDuration = activeBlessing.timerSeconds || BLESSING_TIMER_DURATION;
     const elapsed = Math.floor((Date.now() - blessingTimestamp) / 1000);
     return Math.max(0, blessingDuration - elapsed);
+  };
+
+  const getTimeRemainingForTimeout = (): number => {
+    if (!timeoutTimestamp) return 0;
+    const elapsed = Math.floor((Date.now() - timeoutTimestamp) / 1000);
+    return Math.max(0, TIMEOUT_DURATION - elapsed);
   };
 
   const handleCompleteCurse = (): void => {
@@ -454,6 +483,45 @@ export default function ChallengeSelector() {
 
     setHistory(newHistory);
     drawReplacementCard(remaining, newTimestamps, newHistory, newCoins);
+  };
+
+  const handleVetoCard = (cardId: number): void => {
+    const vetoedCard = drawnCards?.find((card) => card.id === cardId);
+    if (!vetoedCard) return;
+
+    if (
+      !window.confirm(
+        `Veto “${vetoedCard.title}”? It will fail for 0 points and start a 10-minute walking-only timeout.`,
+      )
+    ) {
+      return;
+    }
+
+    const timeLeftWhenVetoed = getTimeRemaining(cardId);
+    if (timeLeftWhenVetoed === 0) {
+      discardExpiredCards([cardId]);
+      return;
+    }
+
+    const newHistory = [
+      {
+        ...vetoedCard,
+        points: 0,
+        completedAt: new Date().toLocaleString(),
+        timeLeftWhenCompleted: timeLeftWhenVetoed,
+        isCurse: false,
+        status: 'vetoed',
+      } as HistoryCard,
+      ...history,
+    ];
+    const remaining = drawnCards?.filter((card) => card.id !== cardId) || [];
+    const newTimestamps = { ...cardTimestamps };
+    delete newTimestamps[cardId];
+
+    const newTimeoutTimestamp = Date.now();
+    setTimeoutTimestamp(newTimeoutTimestamp);
+    setHistory(newHistory);
+    drawReplacementCard(remaining, newTimestamps, newHistory, coins, newTimeoutTimestamp);
   };
 
   const discardExpiredCards = (cardIds?: number[]): void => {
@@ -579,6 +647,29 @@ export default function ChallengeSelector() {
       activeBlessing,
       blessingTimestamp,
       newFreeFahrkarte,
+    );
+  };
+
+  const expireTimeout = (): void => {
+    if (!timeoutTimestamp || getTimeRemainingForTimeout() > 0) return;
+
+    setTimeoutTimestamp(null);
+    saveToStorage(
+      drawnCards,
+      cardTimestamps,
+      history,
+      activeCurse,
+      curseTimestamp,
+      gameStartTime,
+      lastCurseTime,
+      coins,
+      coinEdits,
+      activeFahrkarte,
+      fahrkartenHistory,
+      activeBlessing,
+      blessingTimestamp,
+      activeFreeFahrkarte,
+      null,
     );
   };
 
@@ -736,6 +827,8 @@ export default function ChallengeSelector() {
     setEditComment('');
   };
 
+  const timeoutRemaining = getTimeRemainingForTimeout();
+
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg p-4 text-center shadow-lg">
@@ -801,6 +894,19 @@ export default function ChallengeSelector() {
         </div>
       )}
 
+      {timeoutRemaining > 0 && (
+        <div className="rounded-xl border-2 border-gray-500 bg-gray-700 p-5 text-white shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-bold uppercase opacity-90">🚶 TIMEOUT</div>
+              <h2 className="mt-1 text-2xl font-bold">Walking only</h2>
+            </div>
+            <div className="text-right text-2xl font-bold">{formatTime(timeoutRemaining)}</div>
+          </div>
+          <p className="mt-3">Fahrkarten are ignored until this timeout ends.</p>
+        </div>
+      )}
+
       <div className="space-y-3">
         {activeFahrkarte ? (
           <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl p-8 text-white shadow-2xl flex flex-col">
@@ -818,6 +924,7 @@ export default function ChallengeSelector() {
             <p className="text-lg leading-relaxed mt-4">
               {activeFahrkarte.stops} stops · valid for{' '}
               {Math.round(activeFahrkarte.durationSeconds / 60)} minutes
+              {timeoutRemaining > 0 && ' · ignored during timeout'}
             </p>
             <button
               onClick={handleFinishFahrkarte}
@@ -831,7 +938,8 @@ export default function ChallengeSelector() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {FAHRKARTE_OPTIONS.map((option) => {
                 const cannotAfford = coins < option.cost;
-                const unavailable = cannotAfford || Boolean(activeFreeFahrkarte);
+                const unavailable =
+                  cannotAfford || Boolean(activeFreeFahrkarte) || timeoutRemaining > 0;
                 return (
                   <button
                     key={option.cost}
@@ -855,9 +963,11 @@ export default function ChallengeSelector() {
                       💰 {option.cost} coins
                       {cannotAfford
                         ? ' · Not enough coins'
-                        : activeFreeFahrkarte
-                          ? ' · Free Fahrkarte active'
-                          : ''}
+                        : timeoutRemaining > 0
+                          ? ' · Timeout active'
+                          : activeFreeFahrkarte
+                            ? ' · Free Fahrkarte active'
+                            : ''}
                     </div>
                   </button>
                 );
@@ -882,7 +992,10 @@ export default function ChallengeSelector() {
                 : formatTime(getFreeFahrkarteTimeRemaining())}
             </div>
           </div>
-          <p className="text-lg leading-relaxed mt-4">Free travel · valid for 15 minutes</p>
+          <p className="text-lg leading-relaxed mt-4">
+            Free travel · valid for 15 minutes
+            {timeoutRemaining > 0 && ' · ignored during timeout'}
+          </p>
           <button
             onClick={handleFinishFreeFahrkarte}
             disabled={getFreeFahrkarteStartsIn() > 0}
@@ -1018,6 +1131,13 @@ export default function ChallengeSelector() {
                       ? '🔒 Blocked by curse'
                       : '✓ Complete'}
                 </button>
+                <button
+                  onClick={() => handleVetoCard(card.id)}
+                  disabled={(activeCurse && activeCurse.isBlocking) || timeRemaining === 0}
+                  className="relative z-10 mt-1 w-full py-1 text-xs text-white text-opacity-70 transition hover:text-opacity-100 disabled:cursor-not-allowed disabled:text-opacity-40"
+                >
+                  Veto challenge
+                </button>
               </div>
             );
           })}
@@ -1036,7 +1156,9 @@ export default function ChallengeSelector() {
                     ? 'bg-red-50 text-gray-700 border-red-500'
                     : card.status === 'expired'
                       ? 'bg-gray-100 text-gray-700 border-gray-500'
-                      : 'bg-gray-100 text-gray-700 border-green-500'
+                      : card.status === 'vetoed'
+                        ? 'bg-orange-50 text-gray-700 border-orange-500'
+                        : 'bg-gray-100 text-gray-700 border-green-500'
                 }`}
               >
                 <div className="font-semibold">
@@ -1046,13 +1168,19 @@ export default function ChallengeSelector() {
                       ? '✨ '
                       : card.status === 'expired'
                         ? 'Expired '
-                        : ''}
+                        : card.status === 'vetoed'
+                          ? 'Vetoed '
+                          : ''}
                   #{card.id} - {card.title}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
                   {card.completedAt} ·{' '}
-                  {card.points !== null ? `+${card.points} pts` : 'Variable points'} ·{' '}
-                  {formatTime(card.timeLeftWhenCompleted)} remaining
+                  {card.status === 'vetoed'
+                    ? '0 pts'
+                    : card.points !== null
+                      ? `+${card.points} pts`
+                      : 'Variable points'}{' '}
+                  · {formatTime(card.timeLeftWhenCompleted)} remaining
                 </div>
               </div>
             ))}

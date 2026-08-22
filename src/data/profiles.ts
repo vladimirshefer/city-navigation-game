@@ -8,7 +8,7 @@ export type HistoryCard = Card & {
   completedAt: string;
   timeLeftWhenCompleted: number;
   isCurse: boolean;
-  status?: 'completed' | 'expired';
+  status?: 'completed' | 'expired' | 'vetoed';
 };
 
 export interface Fahrkarte {
@@ -30,6 +30,7 @@ export interface GameState {
   coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[];
   activeCurse: Card | null;
   curseTimestamp: number | null;
+  timeoutTimestamp: number | null;
   activeBlessing: Card | null;
   blessingTimestamp: number | null;
   gameStartTime: number | null;
@@ -54,6 +55,7 @@ export const createEmptyGameState = (): GameState => ({
   coinEdits: [],
   activeCurse: null,
   curseTimestamp: null,
+  timeoutTimestamp: null,
   activeBlessing: null,
   blessingTimestamp: null,
   gameStartTime: null,
