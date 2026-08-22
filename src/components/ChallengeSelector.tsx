@@ -4,6 +4,7 @@ import { getActiveProfile, saveActiveGameState } from '../data/profiles';
 import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles';
 
 const TIMER_DURATION = 3600;
+const BLESSING_TIMER_DURATION = 10 * 60;
 const FAHRKARTE_OPTIONS = [
   { cost: 10, stops: 5, durationSeconds: 20 * 60 },
   { cost: 30, stops: 20, durationSeconds: 60 * 60 },
@@ -356,8 +357,8 @@ export default function ChallengeSelector() {
   };
 
   const getTimeRemainingForBlessing = (): number => {
-    if (!blessingTimestamp || !activeBlessing) return TIMER_DURATION;
-    const blessingDuration = activeBlessing.timerSeconds || TIMER_DURATION;
+    if (!blessingTimestamp || !activeBlessing) return BLESSING_TIMER_DURATION;
+    const blessingDuration = activeBlessing.timerSeconds || BLESSING_TIMER_DURATION;
     const elapsed = Math.floor((Date.now() - blessingTimestamp) / 1000);
     return Math.max(0, blessingDuration - elapsed);
   };
@@ -589,11 +590,25 @@ export default function ChallengeSelector() {
       ...activeFahrkarte,
       finishedAt: new Date().toISOString(),
     };
+    const now = Date.now();
+    const activatedFreeFahrkarte =
+      activeFreeFahrkarte && (activeFreeFahrkarte.startsAt || 0) > now
+        ? {
+            ...activeFreeFahrkarte,
+            startsAt: now,
+            expiresAt: now + activeFreeFahrkarte.durationSeconds * 1000,
+          }
+        : activeFreeFahrkarte;
     const newHistory = fahrkartenHistory.map((fahrkarte) =>
-      fahrkarte.id === finishedFahrkarte.id ? finishedFahrkarte : fahrkarte,
+      fahrkarte.id === finishedFahrkarte.id
+        ? finishedFahrkarte
+        : fahrkarte.id === activatedFreeFahrkarte?.id
+          ? activatedFreeFahrkarte
+          : fahrkarte,
     );
 
     setActiveFahrkarte(null);
+    setActiveFreeFahrkarte(activatedFreeFahrkarte);
     setFahrkartenHistory(newHistory);
     saveToStorage(
       drawnCards,
@@ -609,7 +624,7 @@ export default function ChallengeSelector() {
       newHistory,
       activeBlessing,
       blessingTimestamp,
-      activeFreeFahrkarte,
+      activatedFreeFahrkarte,
     );
   };
 
