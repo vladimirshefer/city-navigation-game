@@ -6,6 +6,11 @@ import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles';
 const TIMER_DURATION = 3600;
 const BLESSING_TIMER_DURATION = 10 * 60;
 const TIMEOUT_DURATION = 10 * 60;
+const CURSE_CHANCE_INTERVAL = 2 * 60 * 60 * 1000;
+const BLESSING_CHANCE_INTERVAL = 60 * 60 * 1000;
+const FREE_FAHRKARTE_CHANCE_INTERVAL = 3 * 60 * 60 * 1000;
+const EFFECT_CHANCE_DURING_INTERVAL = 0.4;
+const EFFECT_CHANCE_AFTER_INTERVAL = 0.8;
 const FAHRKARTE_OPTIONS = [
   { cost: 10, stops: 5, durationSeconds: 20 * 60 },
   { cost: 30, stops: 20, durationSeconds: 60 * 60 },
@@ -116,21 +121,26 @@ export default function ChallengeSelector() {
     return state.drawnCards !== null;
   };
 
-  const getCurseProbability = (referenceTime: number): number => {
-    const timeReference = lastCurseTime || referenceTime;
-    const elapsedMs = Date.now() - timeReference;
-    const elapsedMins = elapsedMs / 60000;
-
-    if (elapsedMins >= 120) return 0.9;
-    if (elapsedMins <= 0) return 0.1;
-
-    return 0.1 + (elapsedMins / 120) * 0.8;
+  const getEffectProbability = (expiredAt: number, interval: number, now: number): number => {
+    const elapsed = now - expiredAt;
+    if (elapsed >= interval) return EFFECT_CHANCE_AFTER_INTERVAL;
+    return Math.max(0, (elapsed / interval) * EFFECT_CHANCE_DURING_INTERVAL);
   };
 
-  const shouldDrawCurse = (referenceTime: number): boolean => {
-    const probability = getCurseProbability(referenceTime);
-    return Math.random() < probability;
+  const getLastChallengeEffectExpiredAt = (
+    cards: HistoryCard[],
+    predicate: (card: HistoryCard) => boolean,
+    fallback: number,
+  ): number => {
+    const lastCard = cards.find(predicate);
+    if (!lastCard) return fallback;
+
+    const expiredAt = new Date(lastCard.completedAt).getTime();
+    return Number.isFinite(expiredAt) ? expiredAt : fallback;
   };
+
+  const shouldDrawEffect = (expiredAt: number, interval: number, now: number): boolean =>
+    Math.random() < getEffectProbability(expiredAt, interval, now);
 
   const getUsedCardIds = (
     cards: Card[] | null,
@@ -155,19 +165,6 @@ export default function ChallengeSelector() {
     const availableBlessings = SPECIAL_CARDS.filter((blessing) => !usedCardIds.has(blessing.id));
     if (availableBlessings.length === 0) return null;
     return availableBlessings[Math.floor(Math.random() * availableBlessings.length)];
-  };
-
-  const drawEffectCard = (
-    usedCardIds: Set<number>,
-  ): { card?: Card; type: 'curse' | 'blessing' | 'freeFahrkarte' } | null => {
-    const curse = drawCurseCard(usedCardIds);
-    const blessing = drawBlessingCard(usedCardIds);
-    const available = [
-      ...(curse ? [{ card: curse, type: 'curse' as const }] : []),
-      ...(blessing ? [{ card: blessing, type: 'blessing' as const }] : []),
-      { type: 'freeFahrkarte' as const },
-    ];
-    return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null;
   };
 
   const createFreeFahrkarte = (now: number): Fahrkarte => {
@@ -197,18 +194,6 @@ export default function ChallengeSelector() {
     let blessing: Card | null = null;
     let blessingTs: number | null = null;
     let freeFahrkarte: Fahrkarte | null = null;
-    if (shouldDrawCurse(now)) {
-      const effect = drawEffectCard(getUsedCardIds(drawn, [], null, null));
-      if (effect?.type === 'blessing' && effect.card) {
-        blessing = effect.card;
-        blessingTs = now;
-      } else if (effect?.type === 'curse' && effect.card) {
-        curse = effect.card;
-        curseTs = now;
-      } else if (effect?.type === 'freeFahrkarte') {
-        freeFahrkarte = createFreeFahrkarte(now);
-      }
-    }
 
     setGameStartTime(now);
     setLastCurseTime(now);
@@ -268,27 +253,64 @@ export default function ChallengeSelector() {
     let blessingTs: number | null = blessingTimestamp;
     let freeFahrkarte: Fahrkarte | null = activeFreeFahrkarte;
     let newFahrkartenHistory = fahrkartenHistory;
-    let lastCurse: number | null = lastCurseTime;
+    const usedCardIds = getUsedCardIds(newCards, hist, null, null);
+    const effectStart = gameStartTime || now;
+    const lastCurseExpiredAt = getLastChallengeEffectExpiredAt(
+      hist,
+      (card) => card.isCurse,
+      lastCurseTime || effectStart,
+    );
+    const lastBlessingExpiredAt = getLastChallengeEffectExpiredAt(
+      hist,
+      (card) => !card.isCurse && isSpecialCard(card),
+      effectStart,
+    );
+    const lastFreeFahrkarte = fahrkartenHistory.find((fahrkarte) => fahrkarte.isFree);
+    const lastFreeFahrkarteExpiredAt = lastFreeFahrkarte
+      ? lastFreeFahrkarte.finishedAt
+        ? new Date(lastFreeFahrkarte.finishedAt).getTime()
+        : lastFreeFahrkarte.expiresAt
+      : effectStart;
+    const triggeredEffects: (
+      { type: 'curse'; card: Card } | { type: 'blessing'; card: Card } | { type: 'freeFahrkarte' }
+    )[] = [];
 
     if (
       !activeCurse &&
+      !timeoutTs &&
+      shouldDrawEffect(lastCurseExpiredAt, CURSE_CHANCE_INTERVAL, now)
+    ) {
+      const card = drawCurseCard(usedCardIds);
+      if (card) triggeredEffects.push({ type: 'curse', card });
+    }
+
+    if (
       !activeBlessing &&
       !timeoutTs &&
-      !activeFreeFahrkarte &&
-      shouldDrawCurse(lastCurseTime || gameStartTime || now)
+      shouldDrawEffect(lastBlessingExpiredAt, BLESSING_CHANCE_INTERVAL, now)
     ) {
-      const effect = drawEffectCard(getUsedCardIds(newCards, hist, null, null));
-      if (effect?.type === 'blessing' && effect.card) {
-        blessing = effect.card;
-        blessingTs = now;
-      } else if (effect?.type === 'curse' && effect.card) {
-        curse = effect.card;
-        curseTs = now;
-        lastCurse = lastCurseTime;
-      } else if (effect?.type === 'freeFahrkarte') {
-        freeFahrkarte = createFreeFahrkarte(now);
-        newFahrkartenHistory = [freeFahrkarte, ...fahrkartenHistory];
-      }
+      const card = drawBlessingCard(usedCardIds);
+      if (card) triggeredEffects.push({ type: 'blessing', card });
+    }
+
+    if (
+      !activeFreeFahrkarte &&
+      !timeoutTs &&
+      shouldDrawEffect(lastFreeFahrkarteExpiredAt, FREE_FAHRKARTE_CHANCE_INTERVAL, now)
+    ) {
+      triggeredEffects.push({ type: 'freeFahrkarte' });
+    }
+
+    const selectedEffect = triggeredEffects[Math.floor(Math.random() * triggeredEffects.length)];
+    if (selectedEffect?.type === 'curse') {
+      curse = selectedEffect.card;
+      curseTs = now;
+    } else if (selectedEffect?.type === 'blessing') {
+      blessing = selectedEffect.card;
+      blessingTs = now;
+    } else if (selectedEffect?.type === 'freeFahrkarte') {
+      freeFahrkarte = createFreeFahrkarte(now);
+      newFahrkartenHistory = [freeFahrkarte, ...fahrkartenHistory];
     }
 
     setDrawnCards(newCards);
@@ -306,7 +328,7 @@ export default function ChallengeSelector() {
       curse,
       curseTs,
       gameStartTime,
-      lastCurse,
+      lastCurseTime,
       coinsValue,
       coinEdits,
       activeFahrkarte,
