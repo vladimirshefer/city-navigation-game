@@ -389,6 +389,35 @@ export default function ChallengeSelector() {
     );
   };
 
+  const handleFinishFahrkarte = (): void => {
+    if (!activeFahrkarte || getFahrkarteTimeRemaining() === 0) return;
+    if (!window.confirm('Finish this Fahrkarte?')) return;
+
+    const finishedFahrkarte = {
+      ...activeFahrkarte,
+      finishedAt: new Date().toISOString(),
+    };
+    const newHistory = fahrkartenHistory.map((fahrkarte) =>
+      fahrkarte.id === finishedFahrkarte.id ? finishedFahrkarte : fahrkarte,
+    );
+
+    setActiveFahrkarte(null);
+    setFahrkartenHistory(newHistory);
+    saveToStorage(
+      drawnCards,
+      cardTimestamps,
+      history,
+      activeCurse,
+      curseTimestamp,
+      gameStartTime,
+      lastCurseTime,
+      coins,
+      coinEdits,
+      null,
+      newHistory,
+    );
+  };
+
   const handleBuyFahrkarte = (option: (typeof FAHRKARTE_OPTIONS)[number]): void => {
     if (activeFahrkarte || coins < option.cost) return;
 
@@ -545,6 +574,12 @@ export default function ChallengeSelector() {
               {activeFahrkarte.stops} stops · valid for{' '}
               {Math.round(activeFahrkarte.durationSeconds / 60)} minutes
             </p>
+            <button
+              onClick={handleFinishFahrkarte}
+              className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+            >
+              ✓ Finish Fahrkarte
+            </button>
           </div>
         ) : (
           <div className="bg-gradient-to-r from-emerald-600 to-teal-500 rounded-xl p-3 text-white shadow-2xl">
@@ -739,17 +774,20 @@ export default function ChallengeSelector() {
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {fahrkartenHistory.map((fahrkarte) => {
               const expired = fahrkarte.expiresAt <= Date.now();
+              const finished = Boolean(fahrkarte.finishedAt);
               return (
                 <div
                   key={fahrkarte.id}
-                  className={`p-3 rounded-lg text-sm border-l-4 ${expired ? 'bg-gray-100 border-gray-500' : 'bg-emerald-50 border-emerald-500'}`}
+                  className={`p-3 rounded-lg text-sm border-l-4 ${finished || expired ? 'bg-gray-100 border-gray-500' : 'bg-emerald-50 border-emerald-500'}`}
                 >
                   <div className="font-semibold">
                     {fahrkarte.stops} stops · {Math.round(fahrkarte.durationSeconds / 60)} minutes ·{' '}
-                    {expired ? 'Expired' : 'Active'}
+                    {finished ? 'Finished' : expired ? 'Expired' : 'Active'}
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
                     {new Date(fahrkarte.purchasedAt).toLocaleString()} · 💰 {fahrkarte.cost} coins
+                    {fahrkarte.finishedAt &&
+                      ` · Finished ${new Date(fahrkarte.finishedAt).toLocaleString()}`}
                   </div>
                 </div>
               );

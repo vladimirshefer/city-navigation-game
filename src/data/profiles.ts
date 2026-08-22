@@ -18,6 +18,7 @@ export interface Fahrkarte {
   durationSeconds: number;
   purchasedAt: string;
   expiresAt: number;
+  finishedAt?: string;
 }
 
 export interface GameState {
