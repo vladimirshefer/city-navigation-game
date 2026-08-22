@@ -239,10 +239,10 @@
   },
   {
     "id": "39",
-    "query": "dog Berlin street",
-    "title": "File:Christopher Street Day Berlin 2018 129.JPG",
-    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Christopher_Street_Day_Berlin_2018_129.JPG",
-    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Christopher_Street_Day_Berlin_2018_129.JPG/1280px-Christopher_Street_Day_Berlin_2018_129.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+    "query": "person petting dog",
+    "title": "File:Petting my dog.jpg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Petting_my_dog.jpg",
+    "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Petting_my_dog.jpg?width=1200"
   },
   {
     "id": "40",
@@ -589,9 +589,9 @@
   },
   {
     "id": "89",
-    "query": "European flags collage",
-    "title": "File:HasekuraBlason.jpg",
-    "sourceUrl": "https://commons.wikimedia.org/wiki/File:HasekuraBlason.jpg",
-    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f0/HasekuraBlason.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+    "query": "European flags",
+    "title": "File:EU flags.jpg",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:EU_flags.jpg",
+    "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/EU_flags.jpg?width=1200"
   }
 ]

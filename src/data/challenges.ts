@@ -333,6 +333,7 @@ const CHALLENGE_CARDS: Card[] = [
     description:
       'Spot at least 7 BVG vehicles in the next minute. This challenge may not be postponed; the countdown starts after reading this.',
     points: 10,
+    timerSeconds: 120,
   },
   {
     id: 54,
@@ -396,6 +397,7 @@ const CHALLENGE_CARDS: Card[] = [
     description:
       'Count all light sources in the next minute and find at least 20. This challenge may not be postponed; the countdown starts after reading this.',
     points: 5,
+    timerSeconds: 120,
   },
   {
     id: 64,

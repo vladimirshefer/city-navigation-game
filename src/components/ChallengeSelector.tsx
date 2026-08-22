@@ -389,9 +389,11 @@ export default function ChallengeSelector() {
   };
 
   const getTimeRemaining = (cardId: number): number => {
-    if (!cardTimestamps[cardId]) return TIMER_DURATION;
+    const card = drawnCards?.find((item) => item.id === cardId);
+    const duration = card?.timerSeconds || TIMER_DURATION;
+    if (!cardTimestamps[cardId]) return duration;
     const elapsed = Math.floor((Date.now() - cardTimestamps[cardId]) / 1000);
-    return Math.max(0, TIMER_DURATION - elapsed);
+    return Math.max(0, duration - elapsed);
   };
 
   const getTimeRemainingForCurse = (): number => {
