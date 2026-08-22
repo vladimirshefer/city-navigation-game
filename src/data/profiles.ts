@@ -50,7 +50,7 @@ export const createEmptyGameState = (): GameState => ({
   curseTimestamp: null,
   gameStartTime: null,
   lastCurseTime: null,
-  coins: 0,
+  coins: 20,
   activeFahrkarte: null,
   fahrkartenHistory: [],
 });

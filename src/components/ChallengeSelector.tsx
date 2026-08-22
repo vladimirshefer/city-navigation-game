@@ -134,10 +134,10 @@ export default function ChallengeSelector() {
     setCoinEdits([]);
     setActiveCurse(curse);
     setCurseTimestamp(curseTs);
-    setCoins(0);
+    setCoins(20);
     setActiveFahrkarte(null);
     setFahrkartenHistory([]);
-    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 0, [], null, []);
+    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 20, [], null, []);
   };
 
   const drawReplacementCard = (
