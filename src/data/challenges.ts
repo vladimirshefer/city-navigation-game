@@ -13,31 +13,33 @@ export interface Card {
 export const SPECIAL_CARDS: Card[] = [
   {
     id: 1,
+    title: 'Steal 10 coins',
     type: 'steal',
+    description:
+      'Steal 10 coins from another team. Ask whether they have at least 10; if not, take what they have.',
     effect:
       'Steal 10 coins from another team. Ask whether they have at least 10; if not, take what they have.',
     points: 10,
   },
   {
     id: 2,
+    title: 'Steal 20 coins',
     type: 'steal',
+    description:
+      'Steal 20 coins from another team. Ask whether they have at least 20; if not, take what they have.',
     effect:
       'Steal 20 coins from another team. Ask whether they have at least 20; if not, take what they have.',
     points: 20,
   },
   {
     id: 3,
+    title: 'Steal 30 coins',
     type: 'steal',
+    description:
+      'Steal 30 coins from another team. Ask whether they have at least 30; if not, take what they have.',
     effect:
       'Steal 30 coins from another team. Ask whether they have at least 30; if not, take what they have.',
     points: 30,
-  },
-  {
-    id: 4,
-    type: 'travel',
-    effect: 'Travel for free for the next 15 minutes. Set a countdown now.',
-    points: 0,
-    timerSeconds: 900,
   },
 ];
 

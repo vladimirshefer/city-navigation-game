@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CHALLENGES, CURSES, Card } from '../data/challenges';
+import { CHALLENGES, CURSES, SPECIAL_CARDS, Card } from '../data/challenges';
 import { getActiveProfile, saveActiveGameState } from '../data/profiles';
 import type { Fahrkarte, GameState, HistoryCard } from '../data/profiles';
 
@@ -19,11 +19,14 @@ export default function ChallengeSelector() {
   >([]);
   const [activeCurse, setActiveCurse] = useState<Card | null>(null);
   const [curseTimestamp, setCurseTimestamp] = useState<number | null>(null);
+  const [activeBlessing, setActiveBlessing] = useState<Card | null>(null);
+  const [blessingTimestamp, setBlessingTimestamp] = useState<number | null>(null);
   const [failedBackgroundImages, setFailedBackgroundImages] = useState<Set<number>>(new Set());
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const [lastCurseTime, setLastCurseTime] = useState<number | null>(null);
   const [coins, setCoins] = useState(0);
   const [activeFahrkarte, setActiveFahrkarte] = useState<Fahrkarte | null>(null);
+  const [activeFreeFahrkarte, setActiveFreeFahrkarte] = useState<Fahrkarte | null>(null);
   const [fahrkartenHistory, setFahrkartenHistory] = useState<Fahrkarte[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editAmount, setEditAmount] = useState('');
@@ -37,18 +40,25 @@ export default function ChallengeSelector() {
   }, []);
 
   useEffect(() => {
-    if ((!drawnCards || drawnCards.length === 0) && !activeCurse && !activeFahrkarte) return;
+    if (
+      (!drawnCards || drawnCards.length === 0) &&
+      !activeCurse &&
+      !activeBlessing &&
+      !activeFahrkarte &&
+      !activeFreeFahrkarte
+    )
+      return;
 
     const interval = setInterval(() => {
       setTickCount((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [drawnCards, activeCurse, activeFahrkarte]);
+  }, [drawnCards, activeCurse, activeBlessing, activeFahrkarte, activeFreeFahrkarte]);
 
   useEffect(() => {
     discardExpiredCards();
-    expireFahrkarte();
+    expireFahrkarten();
   }, [tickCount]);
 
   const loadFromStorage = (): boolean => {
@@ -62,21 +72,28 @@ export default function ChallengeSelector() {
     setCoinEdits(state.coinEdits || []);
     setActiveCurse(state.activeCurse || null);
     setCurseTimestamp(state.curseTimestamp ?? null);
+    setActiveBlessing(state.activeBlessing || null);
+    setBlessingTimestamp(state.blessingTimestamp ?? null);
     setGameStartTime(state.gameStartTime ?? null);
     setLastCurseTime(state.lastCurseTime ?? null);
     setCoins(state.coins ?? 0);
     setFahrkartenHistory(state.fahrkartenHistory || []);
 
     const savedFahrkarte = state.activeFahrkarte || null;
-    if (savedFahrkarte && savedFahrkarte.expiresAt <= Date.now()) {
-      setActiveFahrkarte(null);
+    const savedFreeFahrkarte = state.activeFreeFahrkarte || null;
+    const paidFahrkarte =
+      savedFahrkarte && savedFahrkarte.expiresAt > Date.now() ? savedFahrkarte : null;
+    const freeFahrkarte =
+      savedFreeFahrkarte && savedFreeFahrkarte.expiresAt > Date.now() ? savedFreeFahrkarte : null;
+    setActiveFahrkarte(paidFahrkarte);
+    setActiveFreeFahrkarte(freeFahrkarte);
+    if (paidFahrkarte !== savedFahrkarte || freeFahrkarte !== savedFreeFahrkarte) {
       saveActiveGameState({
         ...state,
-        activeFahrkarte: null,
+        activeFahrkarte: paidFahrkarte,
+        activeFreeFahrkarte: freeFahrkarte,
         fahrkartenHistory: state.fahrkartenHistory || [],
       });
-    } else {
-      setActiveFahrkarte(savedFahrkarte);
     }
     return state.drawnCards !== null;
   };
@@ -101,14 +118,52 @@ export default function ChallengeSelector() {
     cards: Card[] | null,
     hist: HistoryCard[],
     curse: Card | null,
+    blessing: Card | null = activeBlessing,
   ): Set<number> => {
-    return new Set([...(cards || []), ...hist, ...(curse ? [curse] : [])].map((card) => card.id));
+    return new Set(
+      [...(cards || []), ...hist, ...(curse ? [curse] : []), ...(blessing ? [blessing] : [])].map(
+        (card) => card.id,
+      ),
+    );
   };
 
   const drawCurseCard = (usedCardIds: Set<number>): Card | null => {
     const availableCurses = CURSES.filter((curse) => !usedCardIds.has(curse.id));
     if (availableCurses.length === 0) return null;
     return availableCurses[Math.floor(Math.random() * availableCurses.length)];
+  };
+
+  const drawBlessingCard = (usedCardIds: Set<number>): Card | null => {
+    const availableBlessings = SPECIAL_CARDS.filter((blessing) => !usedCardIds.has(blessing.id));
+    if (availableBlessings.length === 0) return null;
+    return availableBlessings[Math.floor(Math.random() * availableBlessings.length)];
+  };
+
+  const drawEffectCard = (
+    usedCardIds: Set<number>,
+  ): { card?: Card; type: 'curse' | 'blessing' | 'freeFahrkarte' } | null => {
+    const curse = drawCurseCard(usedCardIds);
+    const blessing = drawBlessingCard(usedCardIds);
+    const available = [
+      ...(curse ? [{ card: curse, type: 'curse' as const }] : []),
+      ...(blessing ? [{ card: blessing, type: 'blessing' as const }] : []),
+      { type: 'freeFahrkarte' as const },
+    ];
+    return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : null;
+  };
+
+  const createFreeFahrkarte = (now: number): Fahrkarte => {
+    const startsAt = activeFahrkarte?.expiresAt || now;
+    return {
+      id: `free-fahrkarte-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      cost: 0,
+      stops: 0,
+      durationSeconds: 15 * 60,
+      purchasedAt: new Date(now).toISOString(),
+      startsAt,
+      expiresAt: startsAt + 15 * 60 * 1000,
+      isFree: true,
+    };
   };
 
   const drawInitialCards = (): void => {
@@ -121,9 +176,20 @@ export default function ChallengeSelector() {
 
     let curse: Card | null = null;
     let curseTs: number | null = null;
+    let blessing: Card | null = null;
+    let blessingTs: number | null = null;
+    let freeFahrkarte: Fahrkarte | null = null;
     if (shouldDrawCurse(now)) {
-      curse = drawCurseCard(getUsedCardIds(drawn, [], null));
-      if (curse) curseTs = now;
+      const effect = drawEffectCard(getUsedCardIds(drawn, [], null, null));
+      if (effect?.type === 'blessing' && effect.card) {
+        blessing = effect.card;
+        blessingTs = now;
+      } else if (effect?.type === 'curse' && effect.card) {
+        curse = effect.card;
+        curseTs = now;
+      } else if (effect?.type === 'freeFahrkarte') {
+        freeFahrkarte = createFreeFahrkarte(now);
+      }
     }
 
     setGameStartTime(now);
@@ -134,10 +200,29 @@ export default function ChallengeSelector() {
     setCoinEdits([]);
     setActiveCurse(curse);
     setCurseTimestamp(curseTs);
+    setActiveBlessing(blessing);
+    setBlessingTimestamp(blessingTs);
     setCoins(20);
     setActiveFahrkarte(null);
-    setFahrkartenHistory([]);
-    saveToStorage(drawn, newTimestamps, [], curse, curseTs, now, now, 20, [], null, []);
+    setActiveFreeFahrkarte(freeFahrkarte);
+    const initialFahrkartenHistory = freeFahrkarte ? [freeFahrkarte] : [];
+    setFahrkartenHistory(initialFahrkartenHistory);
+    saveToStorage(
+      drawn,
+      newTimestamps,
+      [],
+      curse,
+      curseTs,
+      now,
+      now,
+      20,
+      [],
+      null,
+      initialFahrkartenHistory,
+      blessing,
+      blessingTs,
+      freeFahrkarte,
+    );
   };
 
   const drawReplacementCard = (
@@ -146,7 +231,10 @@ export default function ChallengeSelector() {
     hist: HistoryCard[],
     coinsValue: number = coins,
   ): void => {
-    const replacement = getRandomCards(CHALLENGES, getUsedCardIds(cards, hist, activeCurse))[0];
+    const replacement = getRandomCards(
+      CHALLENGES,
+      getUsedCardIds(cards, hist, activeCurse, activeBlessing),
+    )[0];
     const now = Date.now();
     const newCards = replacement ? [...cards, replacement] : cards;
     const newTimestamps = { ...timestamps };
@@ -156,13 +244,29 @@ export default function ChallengeSelector() {
 
     let curse: Card | null = activeCurse;
     let curseTs: number | null = curseTimestamp;
+    let blessing: Card | null = activeBlessing;
+    let blessingTs: number | null = blessingTimestamp;
+    let freeFahrkarte: Fahrkarte | null = activeFreeFahrkarte;
+    let newFahrkartenHistory = fahrkartenHistory;
     let lastCurse: number | null = lastCurseTime;
 
-    if (!activeCurse && shouldDrawCurse(lastCurseTime || gameStartTime || now)) {
-      curse = drawCurseCard(getUsedCardIds(newCards, hist, null));
-      if (curse) {
+    if (
+      !activeCurse &&
+      !activeBlessing &&
+      !activeFreeFahrkarte &&
+      shouldDrawCurse(lastCurseTime || gameStartTime || now)
+    ) {
+      const effect = drawEffectCard(getUsedCardIds(newCards, hist, null, null));
+      if (effect?.type === 'blessing' && effect.card) {
+        blessing = effect.card;
+        blessingTs = now;
+      } else if (effect?.type === 'curse' && effect.card) {
+        curse = effect.card;
         curseTs = now;
         lastCurse = lastCurseTime;
+      } else if (effect?.type === 'freeFahrkarte') {
+        freeFahrkarte = createFreeFahrkarte(now);
+        newFahrkartenHistory = [freeFahrkarte, ...fahrkartenHistory];
       }
     }
 
@@ -170,6 +274,10 @@ export default function ChallengeSelector() {
     setCardTimestamps(newTimestamps);
     setActiveCurse(curse);
     setCurseTimestamp(curseTs);
+    setActiveBlessing(blessing);
+    setBlessingTimestamp(blessingTs);
+    setActiveFreeFahrkarte(freeFahrkarte);
+    setFahrkartenHistory(newFahrkartenHistory);
     saveToStorage(
       newCards,
       newTimestamps,
@@ -179,6 +287,12 @@ export default function ChallengeSelector() {
       gameStartTime,
       lastCurse,
       coinsValue,
+      coinEdits,
+      activeFahrkarte,
+      newFahrkartenHistory,
+      blessing,
+      blessingTs,
+      freeFahrkarte,
     );
   };
 
@@ -199,6 +313,9 @@ export default function ChallengeSelector() {
     }[] = coinEdits,
     fahrkarte: Fahrkarte | null = activeFahrkarte,
     fahrkartenHist: Fahrkarte[] = fahrkartenHistory,
+    blessing: Card | null = activeBlessing,
+    blessingTs: number | null = blessingTimestamp,
+    freeFahrkarte: Fahrkarte | null = activeFreeFahrkarte,
   ): void => {
     const state: GameState = {
       drawnCards: cards,
@@ -207,10 +324,13 @@ export default function ChallengeSelector() {
       coinEdits: edits,
       activeCurse: curse,
       curseTimestamp: curseTs,
+      activeBlessing: blessing,
+      blessingTimestamp: blessingTs,
       gameStartTime: startTime,
       lastCurseTime: lastCurseTs,
       coins: coinsValue,
       activeFahrkarte: fahrkarte,
+      activeFreeFahrkarte: freeFahrkarte,
       fahrkartenHistory: fahrkartenHist,
     };
     saveActiveGameState(state);
@@ -235,6 +355,13 @@ export default function ChallengeSelector() {
     return Math.max(0, curseDuration - elapsed);
   };
 
+  const getTimeRemainingForBlessing = (): number => {
+    if (!blessingTimestamp || !activeBlessing) return TIMER_DURATION;
+    const blessingDuration = activeBlessing.timerSeconds || TIMER_DURATION;
+    const elapsed = Math.floor((Date.now() - blessingTimestamp) / 1000);
+    return Math.max(0, blessingDuration - elapsed);
+  };
+
   const handleCompleteCurse = (): void => {
     const completedCurse = activeCurse;
     const timeLeftWhenCompleted = getTimeRemainingForCurse();
@@ -255,6 +382,44 @@ export default function ChallengeSelector() {
     setLastCurseTime(now);
     setHistory(newHistory);
     saveToStorage(drawnCards, cardTimestamps, newHistory, null, null, gameStartTime, now, coins);
+  };
+
+  const handleCompleteBlessing = (): void => {
+    if (!activeBlessing) return;
+
+    const completedBlessing = activeBlessing;
+    const timeLeftWhenCompleted = getTimeRemainingForBlessing();
+    const newHistory = [
+      {
+        ...completedBlessing,
+        completedAt: new Date().toLocaleString(),
+        timeLeftWhenCompleted,
+        isCurse: false,
+        status: 'completed',
+      } as HistoryCard,
+      ...history,
+    ];
+    const newCoins = coins + (completedBlessing.points || 0);
+
+    setActiveBlessing(null);
+    setBlessingTimestamp(null);
+    setHistory(newHistory);
+    setCoins(newCoins);
+    saveToStorage(
+      drawnCards,
+      cardTimestamps,
+      newHistory,
+      activeCurse,
+      curseTimestamp,
+      gameStartTime,
+      lastCurseTime,
+      newCoins,
+      coinEdits,
+      activeFahrkarte,
+      fahrkartenHistory,
+      null,
+      null,
+    );
   };
 
   const handleCompleteCard = (cardId: number): void => {
@@ -316,7 +481,7 @@ export default function ChallengeSelector() {
     expiredIds.forEach((id) => delete newTimestamps[id]);
 
     const newCards = drawnCards.filter((card) => !expiredIds.has(card.id));
-    const usedCardIds = getUsedCardIds(newCards, newHistory, activeCurse);
+    const usedCardIds = getUsedCardIds(newCards, newHistory, activeCurse, activeBlessing);
     expiredCards.forEach(() => {
       const replacement = getRandomCards(CHALLENGES, usedCardIds)[0];
       if (!replacement) return;
@@ -341,21 +506,27 @@ export default function ChallengeSelector() {
     );
   };
 
+  const isSpecialCard = (card: Card): boolean =>
+    SPECIAL_CARDS.some((specialCard) => specialCard.id === card.id);
+  const isCurseCard = (card: Card): boolean => CURSES.some((curse) => curse.id === card.id);
+  const isChallengeCard = (card: Card): boolean =>
+    CHALLENGES.some((challenge) => challenge.id === card.id);
+
   const getCategoryColor = (card: Card): string => {
-    if (card.id >= 1 && card.id <= 4) return 'from-purple-500 to-pink-500';
-    if (card.id >= 90 && card.id <= 99) return 'from-red-500 to-orange-500';
+    if (isSpecialCard(card)) return 'from-purple-500 to-pink-500';
+    if (isCurseCard(card)) return 'from-red-500 to-orange-500';
     return 'from-blue-500 to-cyan-500';
   };
 
   const getCategoryLabel = (card: Card): string => {
-    if (card.id >= 1 && card.id <= 4) return 'SPECIAL CARD';
-    if (card.id >= 90 && card.id <= 99) return 'CURSE';
+    if (isSpecialCard(card)) return 'SPECIAL CARD';
+    if (isCurseCard(card)) return 'CURSE';
     return 'CHALLENGE';
   };
 
   const getBackgroundImage = (card: Card): string | undefined => {
     if (card.backgroundImage) return card.backgroundImage;
-    if (card.id >= 5 && card.id <= 89) return `/challenges/${card.id}.jpg`;
+    if (isChallengeCard(card)) return `/challenges/${card.id}.jpg`;
     return undefined;
   };
 
@@ -370,10 +541,28 @@ export default function ChallengeSelector() {
     return Math.max(0, Math.ceil((activeFahrkarte.expiresAt - Date.now()) / 1000));
   };
 
-  const expireFahrkarte = (): void => {
-    if (!activeFahrkarte || getFahrkarteTimeRemaining() > 0) return;
+  const getFreeFahrkarteTimeRemaining = (): number => {
+    if (!activeFreeFahrkarte || Date.now() < (activeFreeFahrkarte.startsAt || 0)) return 0;
+    return Math.max(0, Math.ceil((activeFreeFahrkarte.expiresAt - Date.now()) / 1000));
+  };
 
-    setActiveFahrkarte(null);
+  const getFreeFahrkarteStartsIn = (): number => {
+    if (!activeFreeFahrkarte) return 0;
+    return Math.max(0, Math.ceil(((activeFreeFahrkarte.startsAt || 0) - Date.now()) / 1000));
+  };
+
+  const expireFahrkarten = (): void => {
+    const paidExpired = activeFahrkarte && getFahrkarteTimeRemaining() === 0;
+    const freeExpired =
+      activeFreeFahrkarte &&
+      getFreeFahrkarteTimeRemaining() === 0 &&
+      getFreeFahrkarteStartsIn() === 0;
+    if (!paidExpired && !freeExpired) return;
+
+    const newPaidFahrkarte = paidExpired ? null : activeFahrkarte;
+    const newFreeFahrkarte = freeExpired ? null : activeFreeFahrkarte;
+    setActiveFahrkarte(newPaidFahrkarte);
+    setActiveFreeFahrkarte(newFreeFahrkarte);
     saveToStorage(
       drawnCards,
       cardTimestamps,
@@ -384,8 +573,11 @@ export default function ChallengeSelector() {
       lastCurseTime,
       coins,
       coinEdits,
-      null,
+      newPaidFahrkarte,
       fahrkartenHistory,
+      activeBlessing,
+      blessingTimestamp,
+      newFreeFahrkarte,
     );
   };
 
@@ -415,11 +607,46 @@ export default function ChallengeSelector() {
       coinEdits,
       null,
       newHistory,
+      activeBlessing,
+      blessingTimestamp,
+      activeFreeFahrkarte,
+    );
+  };
+
+  const handleFinishFreeFahrkarte = (): void => {
+    if (!activeFreeFahrkarte || getFreeFahrkarteTimeRemaining() === 0) return;
+    if (!window.confirm('Finish this free Fahrkarte?')) return;
+
+    const finishedFahrkarte = {
+      ...activeFreeFahrkarte,
+      finishedAt: new Date().toISOString(),
+    };
+    const newHistory = fahrkartenHistory.map((fahrkarte) =>
+      fahrkarte.id === finishedFahrkarte.id ? finishedFahrkarte : fahrkarte,
+    );
+
+    setActiveFreeFahrkarte(null);
+    setFahrkartenHistory(newHistory);
+    saveToStorage(
+      drawnCards,
+      cardTimestamps,
+      history,
+      activeCurse,
+      curseTimestamp,
+      gameStartTime,
+      lastCurseTime,
+      coins,
+      coinEdits,
+      activeFahrkarte,
+      newHistory,
+      activeBlessing,
+      blessingTimestamp,
+      null,
     );
   };
 
   const handleBuyFahrkarte = (option: (typeof FAHRKARTE_OPTIONS)[number]): void => {
-    if (activeFahrkarte || coins < option.cost) return;
+    if (activeFahrkarte || activeFreeFahrkarte || coins < option.cost) return;
 
     const now = Date.now();
     const newFahrkarte: Fahrkarte = {
@@ -448,6 +675,9 @@ export default function ChallengeSelector() {
       coinEdits,
       newFahrkarte,
       newHistory,
+      activeBlessing,
+      blessingTimestamp,
+      activeFreeFahrkarte,
     );
   };
 
@@ -586,6 +816,7 @@ export default function ChallengeSelector() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {FAHRKARTE_OPTIONS.map((option) => {
                 const cannotAfford = coins < option.cost;
+                const unavailable = cannotAfford || Boolean(activeFreeFahrkarte);
                 return (
                   <button
                     key={option.cost}
@@ -598,15 +829,20 @@ export default function ChallengeSelector() {
                         handleBuyFahrkarte(option);
                       }
                     }}
-                    disabled={cannotAfford}
-                    className={`rounded-lg border-2 px-4 py-3 text-left transition ${cannotAfford ? 'cursor-not-allowed border-white border-opacity-20 bg-white bg-opacity-10 text-white text-opacity-50' : 'border-white border-opacity-40 bg-white bg-opacity-15 hover:bg-opacity-25'}`}
+                    disabled={unavailable}
+                    className={`rounded-lg border-2 px-4 py-3 text-left transition ${unavailable ? 'cursor-not-allowed border-white border-opacity-20 bg-white bg-opacity-10 text-white text-opacity-50' : 'border-white border-opacity-40 bg-white bg-opacity-15 hover:bg-opacity-25'}`}
                   >
                     <div className="font-bold">🚇 FAHRKARTE</div>
                     <div className="font-bold">
                       {option.stops} stops · {Math.round(option.durationSeconds / 60)} minutes
                     </div>
                     <div className="text-sm mt-1">
-                      💰 {option.cost} coins{cannotAfford ? ' · Not enough coins' : ''}
+                      💰 {option.cost} coins
+                      {cannotAfford
+                        ? ' · Not enough coins'
+                        : activeFreeFahrkarte
+                          ? ' · Free Fahrkarte active'
+                          : ''}
                     </div>
                   </button>
                 );
@@ -615,6 +851,61 @@ export default function ChallengeSelector() {
           </div>
         )}
       </div>
+
+      {activeFreeFahrkarte && (
+        <div className="bg-gradient-to-r from-indigo-700 to-violet-600 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-violet-300">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-sm font-bold opacity-90 uppercase">🎫 FREE FAHRKARTE</div>
+              <h2 className="text-3xl font-bold mt-2">Free public transport access</h2>
+            </div>
+            <div
+              className={`text-right text-2xl font-bold ${getFreeFahrkarteStartsIn() === 0 && getFreeFahrkarteTimeRemaining() < 300 ? 'animate-pulse' : ''}`}
+            >
+              {getFreeFahrkarteStartsIn() > 0
+                ? `Starts in ${formatTime(getFreeFahrkarteStartsIn())}`
+                : formatTime(getFreeFahrkarteTimeRemaining())}
+            </div>
+          </div>
+          <p className="text-lg leading-relaxed mt-4">Free travel · valid for 15 minutes</p>
+          <button
+            onClick={handleFinishFreeFahrkarte}
+            disabled={getFreeFahrkarteStartsIn() > 0}
+            className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 disabled:cursor-not-allowed disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+          >
+            ✓ Finish Free Fahrkarte
+          </button>
+        </div>
+      )}
+
+      {activeBlessing && (
+        <div className="bg-gradient-to-r from-purple-600 to-pink-500 border-purple-700 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2">
+          <div className="space-y-4 flex-1">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-sm font-bold opacity-90 uppercase">
+                  ✨ BLESSING #{activeBlessing.id}
+                </div>
+                <h2 className="text-3xl font-bold mt-2">{activeBlessing.title}</h2>
+              </div>
+              <div
+                className={`text-right text-2xl font-bold ${getTimeRemainingForBlessing() < 300 ? 'animate-pulse' : ''}`}
+              >
+                {formatTime(getTimeRemainingForBlessing())}
+              </div>
+            </div>
+            <p className="text-lg leading-relaxed opacity-95">{activeBlessing.description}</p>
+          </div>
+          <button
+            onClick={() => {
+              if (window.confirm(`Finish “${activeBlessing.title}”?`)) handleCompleteBlessing();
+            }}
+            className="mt-6 w-full bg-white bg-opacity-20 hover:bg-opacity-30 disabled:cursor-not-allowed disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition border border-white border-opacity-30"
+          >
+            ✓ Complete Blessing
+          </button>
+        </div>
+      )}
 
       {activeCurse && (
         <div className="bg-gradient-to-r from-red-600 to-red-500 rounded-xl p-8 text-white shadow-2xl flex flex-col border-2 border-red-700">
@@ -734,8 +1025,14 @@ export default function ChallengeSelector() {
                 }`}
               >
                 <div className="font-semibold">
-                  {card.isCurse ? '⚠ ' : card.status === 'expired' ? 'Expired ' : ''}#{card.id} -{' '}
-                  {card.title}
+                  {card.isCurse
+                    ? '⚠ '
+                    : isSpecialCard(card)
+                      ? '✨ '
+                      : card.status === 'expired'
+                        ? 'Expired '
+                        : ''}
+                  #{card.id} - {card.title}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
                   {card.completedAt} ·{' '}
@@ -772,8 +1069,9 @@ export default function ChallengeSelector() {
         <div className="space-y-2">
           <h3 className="text-lg font-semibold text-gray-800">Fahrkarten History</h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {fahrkartenHistory.map((fahrkarte) => {
-              const expired = fahrkarte.expiresAt <= Date.now();
+            {fahrkartenHistory.map((fahrkarte: Fahrkarte) => {
+              const waiting = Boolean(fahrkarte.startsAt && fahrkarte.startsAt > Date.now());
+              const expired = !waiting && fahrkarte.expiresAt <= Date.now();
               const finished = Boolean(fahrkarte.finishedAt);
               return (
                 <div
@@ -781,11 +1079,14 @@ export default function ChallengeSelector() {
                   className={`p-3 rounded-lg text-sm border-l-4 ${finished || expired ? 'bg-gray-100 border-gray-500' : 'bg-emerald-50 border-emerald-500'}`}
                 >
                   <div className="font-semibold">
-                    {fahrkarte.stops} stops · {Math.round(fahrkarte.durationSeconds / 60)} minutes ·{' '}
-                    {finished ? 'Finished' : expired ? 'Expired' : 'Active'}
+                    {fahrkarte.isFree
+                      ? 'Free Fahrkarte · 15 minutes'
+                      : `${fahrkarte.stops} stops · ${Math.round(fahrkarte.durationSeconds / 60)} minutes`}{' '}
+                    · {finished ? 'Finished' : expired ? 'Expired' : waiting ? 'Waiting' : 'Active'}
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
-                    {new Date(fahrkarte.purchasedAt).toLocaleString()} · 💰 {fahrkarte.cost} coins
+                    {new Date(fahrkarte.purchasedAt).toLocaleString()} ·{' '}
+                    {fahrkarte.isFree ? 'Free' : `💰 ${fahrkarte.cost} coins`}
                     {fahrkarte.finishedAt &&
                       ` · Finished ${new Date(fahrkarte.finishedAt).toLocaleString()}`}
                   </div>

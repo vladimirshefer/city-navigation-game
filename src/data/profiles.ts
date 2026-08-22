@@ -17,7 +17,9 @@ export interface Fahrkarte {
   stops: number;
   durationSeconds: number;
   purchasedAt: string;
+  startsAt?: number;
   expiresAt: number;
+  isFree?: boolean;
   finishedAt?: string;
 }
 
@@ -28,10 +30,13 @@ export interface GameState {
   coinEdits: { timestamp: string; previousAmount: number; newAmount: number; comment: string }[];
   activeCurse: Card | null;
   curseTimestamp: number | null;
+  activeBlessing: Card | null;
+  blessingTimestamp: number | null;
   gameStartTime: number | null;
   lastCurseTime: number | null;
   coins: number;
   activeFahrkarte: Fahrkarte | null;
+  activeFreeFahrkarte: Fahrkarte | null;
   fahrkartenHistory: Fahrkarte[];
 }
 
@@ -49,10 +54,13 @@ export const createEmptyGameState = (): GameState => ({
   coinEdits: [],
   activeCurse: null,
   curseTimestamp: null,
+  activeBlessing: null,
+  blessingTimestamp: null,
   gameStartTime: null,
   lastCurseTime: null,
   coins: 20,
   activeFahrkarte: null,
+  activeFreeFahrkarte: null,
   fahrkartenHistory: [],
 });
 
